@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+
+import React, { useState, useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
-import { Play, Settings } from "lucide-react";
+import { Play, Settings, Download } from "lucide-react";
 
 import Header from "@/components/Header";
 import AudioUploader from "@/components/AudioUploader";
@@ -32,6 +33,9 @@ const Index = () => {
     swingPreservation: true
   });
   
+  // Mock processed audio file reference
+  const [processedAudio, setProcessedAudio] = useState<File | null>(null);
+  
   // Redis processing queue hook
   const { 
     queuedJobs, 
@@ -56,6 +60,10 @@ const Index = () => {
   
   const handleFileSelected = (file: File) => {
     setAudioFile(file);
+    setIsPlaying(false);
+    setProcessingStatus('idle');
+    setProcessProgress(0);
+    setProcessedAudio(null);
     setActiveTab("master");
   };
   
@@ -65,7 +73,7 @@ const Index = () => {
   
   const handleRestart = () => {
     setIsPlaying(false);
-    // In a real implementation, we would reset the audio position
+    // The actual audio position reset is handled in AudioControls
   };
   
   const handleStartProcessing = async () => {
@@ -99,6 +107,11 @@ const Index = () => {
           
           setTimeout(() => {
             setProcessingStatus('completed');
+            
+            // Create a mock processed file when processing completes
+            // In a real application, this would be downloaded from the server
+            createMockProcessedFile(audioFile);
+            
             toast({
               title: "Processing Complete",
               description: "Your audio has been mastered successfully.",
@@ -116,6 +129,42 @@ const Index = () => {
         variant: "destructive"
       });
     }
+  };
+  
+  // Create a mock processed audio file (for demonstration)
+  const createMockProcessedFile = (originalFile: File) => {
+    // In a real app, this would be the actual processed file from the server
+    // Here we're just renaming the original file to simulate processing
+    const nameParts = originalFile.name.split('.');
+    const extension = nameParts.pop();
+    const baseName = nameParts.join('.');
+    const newName = `${baseName}_mastered.${extension}`;
+    
+    const processedFile = new File([originalFile], newName, {
+      type: originalFile.type,
+      lastModified: new Date().getTime()
+    });
+    
+    setProcessedAudio(processedFile);
+  };
+  
+  // Handle download of processed audio
+  const handleDownloadProcessedAudio = () => {
+    if (!processedAudio) return;
+    
+    const url = URL.createObjectURL(processedAudio);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = processedAudio.name;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    toast({
+      title: "Download Started",
+      description: `${processedAudio.name} is being downloaded`
+    });
   };
   
   // Handler for settings panel changes
@@ -247,7 +296,9 @@ const Index = () => {
                         <Button 
                           variant="outline" 
                           className="w-full mt-2 border-moroder-primary/40 hover:bg-moroder-primary/10"
+                          onClick={handleDownloadProcessedAudio}
                         >
+                          <Download className="h-4 w-4 mr-2" />
                           Download Processed Audio
                         </Button>
                       )}

@@ -1,3 +1,4 @@
+
 import { toast } from '@/hooks/use-toast';
 
 // Type definitions for the processing job
@@ -102,10 +103,45 @@ class BrowserRedisClient {
   async hset(key: string, field: string | object, value?: any) {
     const jobId = key.replace('job:', '');
     if (typeof field === 'object') {
-      this.jobsById[jobId] = { ...(this.jobsById[jobId] || {}), ...field };
+      // When updating with an object, ensure we have the required properties
+      const existingJob = this.jobsById[jobId] || {} as ProcessingJob;
+      this.jobsById[jobId] = { 
+        ...existingJob, 
+        ...field,
+        // Ensure required properties have values
+        id: (field as any).id || existingJob.id || jobId,
+        fileName: (field as any).fileName || existingJob.fileName || '',
+        fileSize: (field as any).fileSize || existingJob.fileSize || 0,
+        status: (field as any).status || existingJob.status || 'queued',
+        progress: (field as any).progress || existingJob.progress || 0,
+        settings: {
+          ...(existingJob.settings || {}),
+          ...((field as any).settings || {}),
+          // Ensure required settings have values
+          mode: (field as any).settings?.mode || existingJob.settings?.mode || 'music',
+          targetLufs: (field as any).settings?.targetLufs || existingJob.settings?.targetLufs || -14,
+          dryWet: (field as any).settings?.dryWet || existingJob.settings?.dryWet || 100,
+          noiseReduction: (field as any).settings?.noiseReduction || existingJob.settings?.noiseReduction || 50
+        }
+      };
     } else {
       // Handle single key-value pair setting
-      if (!this.jobsById[jobId]) this.jobsById[jobId] = {} as ProcessingJob;
+      if (!this.jobsById[jobId]) {
+        // Create a new job with required properties if it doesn't exist
+        this.jobsById[jobId] = {
+          id: jobId,
+          fileName: '',
+          fileSize: 0,
+          status: 'queued',
+          progress: 0,
+          settings: {
+            mode: 'music',
+            targetLufs: -14,
+            dryWet: 100,
+            noiseReduction: 50
+          }
+        };
+      }
       (this.jobsById[jobId] as any)[field] = value;
     }
     return Promise.resolve(1);
