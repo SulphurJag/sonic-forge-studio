@@ -1,4 +1,3 @@
-
 import { toast } from '@/hooks/use-toast';
 
 // Type definitions for the processing job
@@ -100,14 +99,12 @@ class BrowserRedisClient {
   }
 
   // Set job data
-  async hset(key: string, data: any) {
+  async hset(key: string, field: string | object, value?: any) {
     const jobId = key.replace('job:', '');
-    if (typeof data === 'object') {
-      this.jobsById[jobId] = { ...(this.jobsById[jobId] || {}), ...data };
+    if (typeof field === 'object') {
+      this.jobsById[jobId] = { ...(this.jobsById[jobId] || {}), ...field };
     } else {
       // Handle single key-value pair setting
-      const field = data;
-      const value = arguments[2];
       if (!this.jobsById[jobId]) this.jobsById[jobId] = {} as ProcessingJob;
       (this.jobsById[jobId] as any)[field] = value;
     }
