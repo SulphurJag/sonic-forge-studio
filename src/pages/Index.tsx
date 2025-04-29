@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { toast } from "@/components/ui/use-toast";
+import { toast } from "@/hooks/use-toast";
 import { Play, Settings } from "lucide-react";
 
 import Header from "@/components/Header";
@@ -13,6 +13,8 @@ import AudioControls from "@/components/AudioControls";
 import SettingsPanel from "@/components/SettingsPanel";
 import MeteringDisplay from "@/components/MeteringDisplay";
 import ProcessingStatus from "@/components/ProcessingStatus";
+import ProcessingQueue from "@/components/ProcessingQueue";
+import { useProcessingQueue } from "@/hooks/use-processing-queue";
 
 const Index = () => {
   const [audioFile, setAudioFile] = useState<File | undefined>(undefined);
@@ -20,6 +22,22 @@ const Index = () => {
   const [activeTab, setActiveTab] = useState("upload");
   const [processingStatus, setProcessingStatus] = useState<'idle' | 'processing' | 'completed' | 'error'>('idle');
   const [processProgress, setProcessProgress] = useState(0);
+  const [processingSettings, setProcessingSettings] = useState({
+    mode: "music",
+    targetLufs: -14,
+    dryWet: 100,
+    noiseReduction: 50,
+    beatQuantization: 0,
+    swingPreservation: true
+  });
+  
+  // Redis processing queue hook
+  const { 
+    queuedJobs, 
+    completedJobs, 
+    isLoading: isQueueLoading,
+    addJob
+  } = useProcessingQueue();
   
   const handleFileSelected = (file: File) => {
     setAudioFile(file);
@@ -35,34 +53,59 @@ const Index = () => {
     // In a real implementation, we would reset the audio position
   };
   
-  const handleStartProcessing = () => {
+  const handleStartProcessing = async () => {
     if (!audioFile) return;
     
     toast({
-      title: "Processing Started",
-      description: `Starting to process ${audioFile.name}`,
+      title: "Adding to Processing Queue",
+      description: `${audioFile.name} is being added to the processing queue`,
     });
     
     setProcessingStatus('processing');
     
-    // Simulate processing progress
-    let progress = 0;
-    const interval = setInterval(() => {
-      progress += Math.random() * 2 + 1;
-      if (progress >= 100) {
-        progress = 100;
-        clearInterval(interval);
-        
-        setTimeout(() => {
-          setProcessingStatus('completed');
-          toast({
-            title: "Processing Complete",
-            description: "Your audio has been mastered successfully.",
-          });
-        }, 500);
-      }
-      setProcessProgress(progress);
-    }, 200);
+    try {
+      // Add the file to the Redis processing queue
+      await addJob(audioFile, {
+        mode: processingSettings.mode,
+        targetLufs: processingSettings.targetLufs,
+        dryWet: processingSettings.dryWet,
+        noiseReduction: processingSettings.noiseReduction,
+        beatQuantization: processingSettings.beatQuantization,
+        swingPreservation: processingSettings.swingPreservation
+      });
+      
+      // Simulate processing progress
+      let progress = 0;
+      const interval = setInterval(() => {
+        progress += Math.random() * 2 + 1;
+        if (progress >= 100) {
+          progress = 100;
+          clearInterval(interval);
+          
+          setTimeout(() => {
+            setProcessingStatus('completed');
+            toast({
+              title: "Processing Complete",
+              description: "Your audio has been mastered successfully.",
+            });
+          }, 500);
+        }
+        setProcessProgress(progress);
+      }, 200);
+    } catch (error) {
+      console.error("Error adding to processing queue:", error);
+      setProcessingStatus('error');
+      toast({
+        title: "Processing Error",
+        description: "Failed to add audio to processing queue",
+        variant: "destructive"
+      });
+    }
+  };
+  
+  // Handler for settings panel changes
+  const handleSettingsChange = (settings: any) => {
+    setProcessingSettings(settings);
   };
   
   return (
@@ -71,9 +114,10 @@ const Index = () => {
       
       <main className="flex-1 container mx-auto px-4 py-6 max-w-6xl">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2 bg-moroder-dark/40 border border-moroder-primary/10">
+          <TabsList className="grid w-full grid-cols-3 bg-moroder-dark/40 border border-moroder-primary/10">
             <TabsTrigger value="upload">Upload Audio</TabsTrigger>
             <TabsTrigger value="master" disabled={!audioFile}>Master Audio</TabsTrigger>
+            <TabsTrigger value="queue">Processing Queue</TabsTrigger>
           </TabsList>
           
           <TabsContent value="upload" className="space-y-6">
@@ -169,7 +213,10 @@ const Index = () => {
                     <Settings className="h-4 w-4 text-muted-foreground" />
                   </CardHeader>
                   <CardContent>
-                    <SettingsPanel disabled={processingStatus === 'processing'} />
+                    <SettingsPanel 
+                      disabled={processingStatus === 'processing'}
+                      onSettingsChange={handleSettingsChange}
+                    />
                     
                     <div className="mt-6 pt-4 border-t border-moroder-primary/10">
                       <Button
@@ -194,6 +241,14 @@ const Index = () => {
                 </Card>
               </div>
             </div>
+          </TabsContent>
+
+          <TabsContent value="queue" className="space-y-6">
+            <ProcessingQueue 
+              queuedJobs={queuedJobs}
+              completedJobs={completedJobs}
+              isLoading={isQueueLoading}
+            />
           </TabsContent>
         </Tabs>
       </main>

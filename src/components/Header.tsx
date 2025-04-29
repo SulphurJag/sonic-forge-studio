@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Button } from "@/components/ui/button";
-import { Volume2, Settings, Upload } from "lucide-react";
+import { Volume2, Settings, Upload, ListOrdered } from "lucide-react";
 
 const Header: React.FC = () => {
   return (
@@ -13,6 +13,10 @@ const Header: React.FC = () => {
         </h1>
       </div>
       <div className="flex items-center space-x-4">
+        <Button variant="ghost" size="sm">
+          <ListOrdered className="h-4 w-4 mr-2" />
+          Queue
+        </Button>
         <Button variant="ghost" size="sm">
           <Settings className="h-4 w-4 mr-2" />
           Settings

@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -14,15 +14,40 @@ import { Separator } from "@/components/ui/separator";
 
 interface SettingsPanelProps {
   disabled?: boolean;
+  onSettingsChange?: (settings: {
+    mode: string;
+    targetLufs: number;
+    dryWet: number;
+    noiseReduction: number;
+    beatQuantization: number;
+    swingPreservation: boolean;
+  }) => void;
 }
 
-const SettingsPanel: React.FC<SettingsPanelProps> = ({ disabled = false }) => {
+const SettingsPanel: React.FC<SettingsPanelProps> = ({ 
+  disabled = false,
+  onSettingsChange
+}) => {
   const [mode, setMode] = useState("music");
   const [targetLufs, setTargetLufs] = useState([-14]);
   const [dryWet, setDryWet] = useState([100]);
   const [beatQuantization, setBeatQuantization] = useState([0]);
   const [swingPreservation, setSwingPreservation] = useState(true);
   const [noiseReduction, setNoiseReduction] = useState([50]);
+
+  // Update parent component when settings change
+  useEffect(() => {
+    if (onSettingsChange) {
+      onSettingsChange({
+        mode,
+        targetLufs: targetLufs[0],
+        dryWet: dryWet[0],
+        noiseReduction: noiseReduction[0],
+        beatQuantization: beatQuantization[0],
+        swingPreservation
+      });
+    }
+  }, [mode, targetLufs, dryWet, beatQuantization, swingPreservation, noiseReduction, onSettingsChange]);
 
   return (
     <div className={`space-y-6 ${disabled ? 'opacity-70' : ''}`}>
