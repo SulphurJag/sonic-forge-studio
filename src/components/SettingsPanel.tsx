@@ -1,0 +1,141 @@
+
+import React, { useState } from 'react';
+import { Slider } from "@/components/ui/slider";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
+
+interface SettingsPanelProps {
+  disabled?: boolean;
+}
+
+const SettingsPanel: React.FC<SettingsPanelProps> = ({ disabled = false }) => {
+  const [mode, setMode] = useState("music");
+  const [targetLufs, setTargetLufs] = useState([-14]);
+  const [dryWet, setDryWet] = useState([100]);
+  const [beatQuantization, setBeatQuantization] = useState([0]);
+  const [swingPreservation, setSwingPreservation] = useState(true);
+  const [noiseReduction, setNoiseReduction] = useState([50]);
+
+  return (
+    <div className={`space-y-6 ${disabled ? 'opacity-70' : ''}`}>
+      <div className="space-y-2">
+        <Label htmlFor="mode">Processing Mode</Label>
+        <Select 
+          disabled={disabled} 
+          value={mode} 
+          onValueChange={setMode}
+        >
+          <SelectTrigger id="mode" className="bg-moroder-dark border border-moroder-primary/20">
+            <SelectValue placeholder="Select mode" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="music">Music</SelectItem>
+            <SelectItem value="podcast">Podcast</SelectItem>
+            <SelectItem value="vocal">Vocal Stem</SelectItem>
+            <SelectItem value="instrumental">Instrumental Stem</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      
+      <Separator className="bg-moroder-primary/20" />
+      
+      <div className="space-y-4">
+        <div className="space-y-2">
+          <div className="flex justify-between">
+            <Label htmlFor="target-lufs">Target Loudness (LUFS)</Label>
+            <span className="text-sm text-muted-foreground">{targetLufs[0]} LUFS</span>
+          </div>
+          <Slider
+            id="target-lufs"
+            disabled={disabled}
+            min={-23}
+            max={-5}
+            step={0.1}
+            value={targetLufs}
+            onValueChange={setTargetLufs}
+            className="py-2"
+          />
+        </div>
+        
+        <div className="space-y-2">
+          <div className="flex justify-between">
+            <Label htmlFor="dry-wet">Dry/Wet Mix</Label>
+            <span className="text-sm text-muted-foreground">{dryWet[0]}%</span>
+          </div>
+          <Slider
+            id="dry-wet"
+            disabled={disabled}
+            min={0}
+            max={100}
+            step={1}
+            value={dryWet}
+            onValueChange={setDryWet}
+            className="py-2"
+          />
+        </div>
+        
+        <div className="space-y-2">
+          <div className="flex justify-between">
+            <Label htmlFor="noise-reduction">Noise Reduction</Label>
+            <span className="text-sm text-muted-foreground">{noiseReduction[0]}%</span>
+          </div>
+          <Slider
+            id="noise-reduction"
+            disabled={disabled}
+            min={0}
+            max={100}
+            step={1}
+            value={noiseReduction}
+            onValueChange={setNoiseReduction}
+            className="py-2"
+          />
+        </div>
+      </div>
+      
+      <Separator className="bg-moroder-primary/20" />
+      
+      {mode === "music" && (
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <div className="flex justify-between">
+              <Label htmlFor="beat-quantization">Beat Quantization Strength</Label>
+              <span className="text-sm text-muted-foreground">{beatQuantization[0]/100}</span>
+            </div>
+            <Slider
+              id="beat-quantization"
+              disabled={disabled}
+              min={0}
+              max={100}
+              step={1}
+              value={beatQuantization}
+              onValueChange={setBeatQuantization}
+              className="py-2"
+            />
+          </div>
+          
+          <div className="flex items-center justify-between">
+            <Label htmlFor="swing-preservation" className="cursor-pointer">
+              Swing Preservation
+            </Label>
+            <Switch
+              id="swing-preservation"
+              disabled={disabled || beatQuantization[0] === 0}
+              checked={swingPreservation}
+              onCheckedChange={setSwingPreservation}
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default SettingsPanel;
