@@ -1,25 +1,7 @@
 
-import { Redis } from 'ioredis';
 import { toast } from '@/hooks/use-toast';
 
-// Create a Redis client
-const redisClient = new Redis(process.env.REDIS_URL || "redis://localhost:6379");
-
-// Handle Redis connection events
-redisClient.on('error', (err) => {
-  console.error('Redis connection error:', err);
-  toast({
-    title: "Redis Connection Error",
-    description: "Could not connect to the processing queue. Please try again later.",
-    variant: "destructive"
-  });
-});
-
-redisClient.on('connect', () => {
-  console.log('Connected to Redis');
-});
-
-// Processing queue functions
+// Type definitions for the processing job
 export type ProcessingJob = {
   id: string;
   fileName: string;
@@ -45,6 +27,144 @@ export type ProcessingJob = {
   };
   error?: string;
 };
+
+// In-memory storage for browser environment
+class BrowserRedisClient {
+  private queuedJobs: ProcessingJob[] = [];
+  private completedJobs: ProcessingJob[] = [];
+  private jobsById: Record<string, ProcessingJob> = {};
+
+  // Simulating Redis connection events
+  constructor() {
+    console.log('Browser Redis client initialized');
+    
+    // Simulate processing of queued jobs
+    setInterval(() => {
+      this.processJobs();
+    }, 2000);
+  }
+
+  // Process jobs in queue
+  private processJobs() {
+    this.queuedJobs.forEach((job) => {
+      if (job.status === 'queued') {
+        // Start processing
+        job.status = 'processing';
+        job.progress = 0;
+        
+        // Simulate processing progress
+        const progressInterval = setInterval(() => {
+          if (job.status !== 'processing') {
+            clearInterval(progressInterval);
+            return;
+          }
+          
+          job.progress += Math.random() * 5 + 3; // Random progress increment
+          
+          if (job.progress >= 100) {
+            job.progress = 100;
+            job.status = 'completed';
+            job.endTime = Date.now();
+            
+            // Generate mock results
+            job.results = {
+              inputLufs: Math.random() * -10 - 10, // Between -20 and -10
+              outputLufs: -14.0,
+              inputPeak: Math.random() * -5, // Between -5 and 0
+              outputPeak: -1.0,
+              noiseReduction: Math.random() * 6 + 2, // Between 2 and 8
+            };
+            
+            // Move to completed jobs
+            this.completedJobs.push({...job});
+            this.queuedJobs = this.queuedJobs.filter(j => j.id !== job.id);
+            
+            clearInterval(progressInterval);
+            
+            toast({
+              title: "Processing Complete",
+              description: `${job.fileName} has been processed successfully`,
+            });
+          }
+        }, 1000);
+      }
+    });
+  }
+
+  // Add job to queue
+  async rpush(key: string, value: string) {
+    const job = JSON.parse(value);
+    this.queuedJobs.push(job);
+    this.jobsById[job.id] = job;
+    return Promise.resolve(this.queuedJobs.length);
+  }
+
+  // Set job data
+  async hset(key: string, data: any) {
+    const jobId = key.replace('job:', '');
+    if (typeof data === 'object') {
+      this.jobsById[jobId] = { ...(this.jobsById[jobId] || {}), ...data };
+    } else {
+      // Handle single key-value pair setting
+      const field = data;
+      const value = arguments[2];
+      if (!this.jobsById[jobId]) this.jobsById[jobId] = {} as ProcessingJob;
+      (this.jobsById[jobId] as any)[field] = value;
+    }
+    return Promise.resolve(1);
+  }
+
+  // Get all from list
+  async llen(key: string) {
+    if (key.includes('queue')) {
+      return Promise.resolve(this.queuedJobs.length);
+    } else {
+      return Promise.resolve(this.completedJobs.length);
+    }
+  }
+
+  // Get items from list
+  async lrange(key: string, start: number, end: number) {
+    let list: ProcessingJob[] = [];
+    if (key.includes('queue')) {
+      list = this.queuedJobs;
+    } else {
+      list = this.completedJobs;
+    }
+    
+    const result = list.slice(start, end + 1).map(job => JSON.stringify(job));
+    return Promise.resolve(result);
+  }
+
+  // Get job by ID
+  async hgetall(key: string) {
+    const jobId = key.replace('job:', '');
+    const job = this.jobsById[jobId];
+    return Promise.resolve(job || null);
+  }
+
+  // Remove from list
+  async lrem(key: string, count: number, value: string) {
+    const jobToRemove = JSON.parse(value);
+    if (key.includes('queue')) {
+      this.queuedJobs = this.queuedJobs.filter(job => job.id !== jobToRemove.id);
+    } else {
+      this.completedJobs = this.completedJobs.filter(job => job.id !== jobToRemove.id);
+    }
+    return Promise.resolve(1);
+  }
+
+  // For connection status simulation
+  on(event: string, callback: Function) {
+    if (event === 'connect') {
+      setTimeout(() => callback(), 100); // Simulate connection success
+    }
+    return this;
+  }
+}
+
+// Create a browser-compatible Redis client
+const redisClient = new BrowserRedisClient();
 
 // Queue names
 const PROCESSING_QUEUE = 'moroder:processing:queue';

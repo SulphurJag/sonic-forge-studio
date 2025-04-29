@@ -1,5 +1,5 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,7 @@ import ProcessingQueue from "@/components/ProcessingQueue";
 import { useProcessingQueue } from "@/hooks/use-processing-queue";
 
 const Index = () => {
+  const location = useLocation();
   const [audioFile, setAudioFile] = useState<File | undefined>(undefined);
   const [isPlaying, setIsPlaying] = useState(false);
   const [activeTab, setActiveTab] = useState("upload");
@@ -38,6 +39,20 @@ const Index = () => {
     isLoading: isQueueLoading,
     addJob
   } = useProcessingQueue();
+
+  // Handle tab changes from URL parameters
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const tabParam = searchParams.get('tab');
+    
+    if (tabParam === 'queue') {
+      setActiveTab('queue');
+    } else if (tabParam === 'settings' && audioFile) {
+      setActiveTab('master');
+    } else if (audioFile) {
+      setActiveTab('master');
+    }
+  }, [location.search, audioFile]);
   
   const handleFileSelected = (file: File) => {
     setAudioFile(file);
