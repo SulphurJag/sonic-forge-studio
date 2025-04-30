@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -23,7 +22,7 @@ const Index = () => {
   const [audioFile, setAudioFile] = useState<File | undefined>(undefined);
   const [isPlaying, setIsPlaying] = useState(false);
   const [activeTab, setActiveTab] = useState("upload");
-  const [processingStatus, setProcessingStatus] = useState<'idle' | 'processing' | 'completed' | 'error'>('idle');
+  const [processingStatus, setProcessingStatus] = useState<'idle' | 'loading' | 'processing' | 'completed' | 'error'>('idle');
   const [processProgress, setProcessProgress] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const [audioDuration, setAudioDuration] = useState(0);
@@ -76,7 +75,7 @@ const Index = () => {
   const handleFileSelected = (file: File) => {
     setAudioFile(file);
     setIsPlaying(false);
-    setProcessingStatus('idle');
+    setProcessingStatus('loading');
     setProcessProgress(0);
     setProcessedAudio(null);
     setProcessingResults(null);
@@ -85,14 +84,23 @@ const Index = () => {
     setAudioDuration(0);
     
     // Load the audio file into the processor
-    audioProcessor.loadAudio(file).catch(error => {
-      console.error("Error loading audio:", error);
-      toast({
-        title: "Audio Loading Error",
-        description: "Failed to load the audio file",
-        variant: "destructive"
+    audioProcessor.loadAudio(file)
+      .then(() => {
+        setProcessingStatus('idle');
+        toast({
+          title: "Audio Loaded",
+          description: "Audio file is ready for processing",
+        });
+      })
+      .catch(error => {
+        console.error("Error loading audio:", error);
+        setProcessingStatus('error');
+        toast({
+          title: "Audio Loading Error",
+          description: "Failed to load the audio file",
+          variant: "destructive"
+        });
       });
-    });
   };
   
   const handlePlayPause = () => {
@@ -120,6 +128,11 @@ const Index = () => {
     setProcessingStatus('processing');
     
     try {
+      // Check if audio is loaded
+      if (!audioProcessor || !audioProcessor.isAudioLoaded()) {
+        throw new Error("Audio file is not loaded properly. Please reload the file and try again.");
+      }
+      
       // Add the file to the Redis processing queue for tracking
       await addJob(audioFile, processingSettings);
       
@@ -160,7 +173,7 @@ const Index = () => {
       setProcessingStatus('error');
       toast({
         title: "Processing Error",
-        description: "Failed to process audio",
+        description: error instanceof Error ? error.message : "Failed to process audio",
         variant: "destructive"
       });
     }

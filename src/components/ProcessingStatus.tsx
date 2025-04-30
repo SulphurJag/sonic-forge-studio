@@ -1,9 +1,9 @@
 
 import React from 'react';
 import { Progress } from "@/components/ui/progress";
-import { Loader2, CheckCircle, AlertCircle } from "lucide-react";
+import { Loader2, CheckCircle, AlertCircle, AlertTriangle } from "lucide-react";
 
-type ProcessingStatus = 'idle' | 'processing' | 'completed' | 'error';
+type ProcessingStatus = 'idle' | 'loading' | 'processing' | 'completed' | 'error';
 
 interface ProcessingStatusProps {
   status: ProcessingStatus;
@@ -30,6 +30,14 @@ const ProcessingStatus: React.FC<ProcessingStatusProps> = ({
         return (
           <div className="text-center py-6 text-muted-foreground">
             <p>Ready to process audio</p>
+          </div>
+        );
+      
+      case 'loading':
+        return (
+          <div className="flex items-center justify-center space-x-2 text-amber-500 py-6">
+            <AlertTriangle className="h-5 w-5" />
+            <span>Loading audio file...</span>
           </div>
         );
       
@@ -96,9 +104,15 @@ const ProcessingStatus: React.FC<ProcessingStatusProps> = ({
       
       case 'error':
         return (
-          <div className="flex items-center justify-center space-x-2 text-red-500 py-6">
+          <div className="flex flex-col items-center justify-center space-y-2 text-red-500 py-6">
             <AlertCircle className="h-5 w-5" />
             <span>{error || 'An error occurred during processing'}</span>
+            {error?.includes('Audio context or buffer not initialized') && (
+              <p className="text-sm text-center max-w-md">
+                Please make sure the audio file is fully loaded before processing. 
+                Try uploading the file again and wait for it to load completely.
+              </p>
+            )}
           </div>
         );
     }

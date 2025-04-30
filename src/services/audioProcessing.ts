@@ -382,6 +382,11 @@ export class AudioMasteringEngine {
   private originalBuffer?: AudioBuffer;
   private targetLufs: number = -14;
   
+  // Check if audio is loaded and ready for processing
+  isAudioLoaded(): boolean {
+    return !!this.originalBuffer && !!this.audioContext;
+  }
+  
   // Initialize the audio context
   initialize(): void {
     try {
