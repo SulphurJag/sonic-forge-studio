@@ -24,6 +24,8 @@ const Index = () => {
   const [activeTab, setActiveTab] = useState("upload");
   const [processingStatus, setProcessingStatus] = useState<'idle' | 'processing' | 'completed' | 'error'>('idle');
   const [processProgress, setProcessProgress] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [audioDuration, setAudioDuration] = useState(0);
   const [processingSettings, setProcessingSettings] = useState({
     mode: "music",
     targetLufs: -14,
@@ -65,6 +67,8 @@ const Index = () => {
     setProcessProgress(0);
     setProcessedAudio(null);
     setActiveTab("master");
+    setCurrentTime(0);
+    setAudioDuration(0);
   };
   
   const handlePlayPause = () => {
@@ -74,6 +78,11 @@ const Index = () => {
   const handleRestart = () => {
     setIsPlaying(false);
     // The actual audio position reset is handled in AudioControls
+  };
+  
+  const handleTimeUpdate = (time: number, duration: number) => {
+    setCurrentTime(time);
+    setAudioDuration(duration);
   };
   
   const handleStartProcessing = async () => {
@@ -230,12 +239,17 @@ const Index = () => {
                     <CardTitle>Audio Waveform</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <Waveform audioFile={audioFile} />
+                    <Waveform 
+                      audioFile={audioFile} 
+                      currentTime={currentTime} 
+                      duration={audioDuration} 
+                    />
                     <AudioControls
                       isPlaying={isPlaying}
                       onPlayPause={handlePlayPause}
                       onRestart={handleRestart}
                       audioFile={audioFile}
+                      onTimeUpdate={handleTimeUpdate}
                     />
                   </CardContent>
                 </Card>

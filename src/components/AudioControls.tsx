@@ -9,13 +9,15 @@ interface AudioControlsProps {
   onPlayPause: () => void;
   onRestart: () => void;
   audioFile?: File;
+  onTimeUpdate?: (currentTime: number, duration: number) => void;
 }
 
 const AudioControls: React.FC<AudioControlsProps> = ({
   isPlaying,
   onPlayPause,
   onRestart,
-  audioFile
+  audioFile,
+  onTimeUpdate
 }) => {
   const [volume, setVolume] = useState([80]);
   const [currentTime, setCurrentTime] = useState(0);
@@ -40,11 +42,16 @@ const AudioControls: React.FC<AudioControlsProps> = ({
       
       // Set up audio event listeners
       audioRef.current.addEventListener('loadedmetadata', () => {
-        setDuration(audioRef.current?.duration || 0);
+        const newDuration = audioRef.current?.duration || 0;
+        setDuration(newDuration);
+        if (onTimeUpdate) onTimeUpdate(0, newDuration);
       });
       
       audioRef.current.addEventListener('timeupdate', () => {
-        setCurrentTime(audioRef.current?.currentTime || 0);
+        const newTime = audioRef.current?.currentTime || 0;
+        const newDuration = audioRef.current?.duration || 0;
+        setCurrentTime(newTime);
+        if (onTimeUpdate) onTimeUpdate(newTime, newDuration);
       });
       
       audioRef.current.addEventListener('ended', () => {
@@ -67,7 +74,7 @@ const AudioControls: React.FC<AudioControlsProps> = ({
         audioSrcRef.current = null;
       }
     };
-  }, [audioFile]);
+  }, [audioFile, onTimeUpdate]);
   
   // Handle play/pause state changes
   useEffect(() => {
@@ -111,6 +118,18 @@ const AudioControls: React.FC<AudioControlsProps> = ({
     return <Volume2 className="h-4 w-4" />;
   };
   
+  // Handle time seeking
+  const handleTimeSeek = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!audioRef.current || !audioFile) return;
+    
+    const rect = e.currentTarget.getBoundingClientRect();
+    const pos = (e.clientX - rect.left) / rect.width;
+    const newTime = pos * duration;
+    
+    audioRef.current.currentTime = newTime;
+    setCurrentTime(newTime);
+  };
+  
   return (
     <div className="w-full flex items-center space-x-2 py-2 px-4 bg-moroder-dark/50 backdrop-blur-sm rounded-lg border border-moroder-primary/10">
       <Button 
@@ -139,17 +158,9 @@ const AudioControls: React.FC<AudioControlsProps> = ({
       </div>
       
       {/* Progress bar */}
-      <div className="relative w-full h-1.5 bg-muted rounded-full overflow-hidden cursor-pointer"
-        onClick={(e) => {
-          if (!audioRef.current || !audioFile) return;
-          
-          const rect = e.currentTarget.getBoundingClientRect();
-          const pos = (e.clientX - rect.left) / rect.width;
-          const newTime = pos * duration;
-          
-          audioRef.current.currentTime = newTime;
-          setCurrentTime(newTime);
-        }}
+      <div 
+        className="relative w-full h-1.5 bg-muted rounded-full overflow-hidden cursor-pointer"
+        onClick={handleTimeSeek}
       >
         <div 
           className="absolute top-0 left-0 h-full bg-moroder-primary/70 rounded-full"
