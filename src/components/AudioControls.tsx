@@ -9,6 +9,7 @@ interface AudioControlsProps {
   onPlayPause: () => void;
   onRestart: () => void;
   audioFile?: File;
+  processedAudio?: File | null;
   onTimeUpdate?: (currentTime: number, duration: number) => void;
 }
 
@@ -17,6 +18,7 @@ const AudioControls: React.FC<AudioControlsProps> = ({
   onPlayPause,
   onRestart,
   audioFile,
+  processedAudio,
   onTimeUpdate
 }) => {
   const [volume, setVolume] = useState([80]);
@@ -25,9 +27,12 @@ const AudioControls: React.FC<AudioControlsProps> = ({
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioSrcRef = useRef<string | null>(null);
   
+  // Select which audio file to play (processed or original)
+  const activeAudioFile = processedAudio || audioFile;
+  
   // Create or update audio element when audioFile changes
   useEffect(() => {
-    if (!audioFile) {
+    if (!activeAudioFile) {
       return;
     }
     
@@ -60,7 +65,7 @@ const AudioControls: React.FC<AudioControlsProps> = ({
     }
     
     // Create object URL for the audio file
-    audioSrcRef.current = URL.createObjectURL(audioFile);
+    audioSrcRef.current = URL.createObjectURL(activeAudioFile);
     audioRef.current.src = audioSrcRef.current;
     audioRef.current.load();
     
@@ -74,7 +79,7 @@ const AudioControls: React.FC<AudioControlsProps> = ({
         audioSrcRef.current = null;
       }
     };
-  }, [audioFile, onTimeUpdate]);
+  }, [activeAudioFile, onTimeUpdate]);
   
   // Handle play/pause state changes
   useEffect(() => {
@@ -120,7 +125,7 @@ const AudioControls: React.FC<AudioControlsProps> = ({
   
   // Handle time seeking
   const handleTimeSeek = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!audioRef.current || !audioFile) return;
+    if (!audioRef.current || !activeAudioFile) return;
     
     const rect = e.currentTarget.getBoundingClientRect();
     const pos = (e.clientX - rect.left) / rect.width;
@@ -135,8 +140,8 @@ const AudioControls: React.FC<AudioControlsProps> = ({
       <Button 
         variant="outline" 
         size="sm" 
-        className={`rounded-full p-2 h-10 w-10 ${!audioFile ? 'opacity-50 cursor-not-allowed' : ''}`}
-        disabled={!audioFile}
+        className={`rounded-full p-2 h-10 w-10 ${!activeAudioFile ? 'opacity-50 cursor-not-allowed' : ''}`}
+        disabled={!activeAudioFile}
         onClick={handleRestart}
       >
         <SkipBack className="h-4 w-4" />
@@ -145,8 +150,8 @@ const AudioControls: React.FC<AudioControlsProps> = ({
       <Button 
         variant="outline" 
         size="sm" 
-        className={`rounded-full p-2 h-10 w-10 ${!audioFile ? 'opacity-50 cursor-not-allowed' : ''}`}
-        disabled={!audioFile}
+        className={`rounded-full p-2 h-10 w-10 ${!activeAudioFile ? 'opacity-50 cursor-not-allowed' : ''}`}
+        disabled={!activeAudioFile}
         onClick={onPlayPause}
       >
         {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
@@ -154,7 +159,7 @@ const AudioControls: React.FC<AudioControlsProps> = ({
       
       {/* Time display */}
       <div className="text-xs text-muted-foreground">
-        {formatTime(currentTime)} / {audioFile ? formatTime(duration) : '--:--'}
+        {formatTime(currentTime)} / {activeAudioFile ? formatTime(duration) : '--:--'}
       </div>
       
       {/* Progress bar */}
@@ -179,6 +184,13 @@ const AudioControls: React.FC<AudioControlsProps> = ({
           onValueChange={(value) => setVolume(value)}
         />
       </div>
+      
+      {/* Processed indicator */}
+      {processedAudio && (
+        <div className="px-2 py-0.5 bg-moroder-primary/20 text-xs rounded text-moroder-accent">
+          Mastered
+        </div>
+      )}
     </div>
   );
 };

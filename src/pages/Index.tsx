@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,6 +16,7 @@ import MeteringDisplay from "@/components/MeteringDisplay";
 import ProcessingStatus from "@/components/ProcessingStatus";
 import ProcessingQueue from "@/components/ProcessingQueue";
 import { useProcessingQueue } from "@/hooks/use-processing-queue";
+import { audioProcessor, ProcessingResults } from "@/services/audioProcessing";
 
 const Index = () => {
   const location = useLocation();
@@ -35,8 +36,11 @@ const Index = () => {
     swingPreservation: true
   });
   
-  // Mock processed audio file reference
+  // Processed audio file reference
   const [processedAudio, setProcessedAudio] = useState<File | null>(null);
+  
+  // Processing results
+  const [processingResults, setProcessingResults] = useState<ProcessingResults | null>(null);
   
   // Redis processing queue hook
   const { 
@@ -45,6 +49,15 @@ const Index = () => {
     isLoading: isQueueLoading,
     addJob
   } = useProcessingQueue();
+
+  // Initialize audio processor
+  useEffect(() => {
+    audioProcessor.initialize();
+    
+    return () => {
+      audioProcessor.dispose();
+    };
+  }, []);
 
   // Handle tab changes from URL parameters
   useEffect(() => {
@@ -66,9 +79,20 @@ const Index = () => {
     setProcessingStatus('idle');
     setProcessProgress(0);
     setProcessedAudio(null);
+    setProcessingResults(null);
     setActiveTab("master");
     setCurrentTime(0);
     setAudioDuration(0);
+    
+    // Load the audio file into the processor
+    audioProcessor.loadAudio(file).catch(error => {
+      console.error("Error loading audio:", error);
+      toast({
+        title: "Audio Loading Error",
+        description: "Failed to load the audio file",
+        variant: "destructive"
+      });
+    });
   };
   
   const handlePlayPause = () => {
@@ -89,72 +113,57 @@ const Index = () => {
     if (!audioFile) return;
     
     toast({
-      title: "Adding to Processing Queue",
-      description: `${audioFile.name} is being added to the processing queue`,
+      title: "Starting Audio Processing",
+      description: `${audioFile.name} is being mastered`,
     });
     
     setProcessingStatus('processing');
     
     try {
-      // Add the file to the Redis processing queue
-      await addJob(audioFile, {
-        mode: processingSettings.mode,
-        targetLufs: processingSettings.targetLufs,
-        dryWet: processingSettings.dryWet,
-        noiseReduction: processingSettings.noiseReduction,
-        beatQuantization: processingSettings.beatQuantization,
-        swingPreservation: processingSettings.swingPreservation
-      });
+      // Add the file to the Redis processing queue for tracking
+      await addJob(audioFile, processingSettings);
       
-      // Simulate processing progress
-      let progress = 0;
-      const interval = setInterval(() => {
-        progress += Math.random() * 2 + 1;
-        if (progress >= 100) {
-          progress = 100;
-          clearInterval(interval);
-          
-          setTimeout(() => {
-            setProcessingStatus('completed');
-            
-            // Create a mock processed file when processing completes
-            // In a real application, this would be downloaded from the server
-            createMockProcessedFile(audioFile);
-            
-            toast({
-              title: "Processing Complete",
-              description: "Your audio has been mastered successfully.",
-            });
-          }, 500);
-        }
-        setProcessProgress(progress);
+      // Process progress simulation
+      const progressInterval = setInterval(() => {
+        setProcessProgress(prev => {
+          if (prev >= 95) {
+            clearInterval(progressInterval);
+            return 95;
+          }
+          return prev + (Math.random() * 5 + 1);
+        });
       }, 200);
+      
+      // Actual audio processing
+      const results = await audioProcessor.processAudio(processingSettings);
+      
+      // Get the processed file
+      const processedFile = await audioProcessor.getProcessedFile(audioFile);
+      
+      // Complete the progress and update the status
+      clearInterval(progressInterval);
+      setProcessProgress(100);
+      
+      // Delay a bit to show 100% completion
+      setTimeout(() => {
+        setProcessingStatus('completed');
+        setProcessingResults(results);
+        setProcessedAudio(processedFile);
+        
+        toast({
+          title: "Processing Complete",
+          description: "Your audio has been mastered successfully.",
+        });
+      }, 500);
     } catch (error) {
-      console.error("Error adding to processing queue:", error);
+      console.error("Error processing audio:", error);
       setProcessingStatus('error');
       toast({
         title: "Processing Error",
-        description: "Failed to add audio to processing queue",
+        description: "Failed to process audio",
         variant: "destructive"
       });
     }
-  };
-  
-  // Create a mock processed audio file (for demonstration)
-  const createMockProcessedFile = (originalFile: File) => {
-    // In a real app, this would be the actual processed file from the server
-    // Here we're just renaming the original file to simulate processing
-    const nameParts = originalFile.name.split('.');
-    const extension = nameParts.pop();
-    const baseName = nameParts.join('.');
-    const newName = `${baseName}_mastered.${extension}`;
-    
-    const processedFile = new File([originalFile], newName, {
-      type: originalFile.type,
-      lastModified: new Date().getTime()
-    });
-    
-    setProcessedAudio(processedFile);
   };
   
   // Handle download of processed audio
@@ -240,7 +249,7 @@ const Index = () => {
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <Waveform 
-                      audioFile={audioFile} 
+                      audioFile={processedAudio || audioFile} 
                       currentTime={currentTime} 
                       duration={audioDuration} 
                     />
@@ -249,6 +258,7 @@ const Index = () => {
                       onPlayPause={handlePlayPause}
                       onRestart={handleRestart}
                       audioFile={audioFile}
+                      processedAudio={processedAudio}
                       onTimeUpdate={handleTimeUpdate}
                     />
                   </CardContent>
@@ -268,15 +278,7 @@ const Index = () => {
                 <ProcessingStatus 
                   status={processingStatus} 
                   progress={processProgress}
-                  results={
-                    processingStatus === 'completed' ? {
-                      inputLufs: -18.3,
-                      outputLufs: -14.0,
-                      inputPeak: -3.2,
-                      outputPeak: -1.0,
-                      noiseReduction: 4.2
-                    } : undefined
-                  }
+                  results={processingResults}
                 />
               </div>
               

@@ -1,5 +1,5 @@
-
 import React, { useEffect, useRef, useState } from 'react';
+import { generateWaveformData } from '@/services/audioVisualization';
 
 interface WaveformProps {
   audioFile?: File;
