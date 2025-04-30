@@ -656,7 +656,10 @@ export class AudioMasteringEngine {
   // Clean up resources
   dispose(): void {
     if (this.audioContext) {
-      this.audioContext.close().catch(console.error);
+      // Check if the audioContext has a close method (only available on AudioContext, not BaseAudioContext)
+      if ('close' in this.audioContext) {
+        (this.audioContext as AudioContext).close().catch(console.error);
+      }
       this.audioContext = undefined;
     }
     this.sourceNode = undefined;
