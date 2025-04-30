@@ -1,4 +1,3 @@
-
 import { toast } from "@/hooks/use-toast";
 
 // Audio processing configuration types
@@ -19,13 +18,16 @@ export interface ProcessingResults {
   noiseReduction: number;
 }
 
+// Use BaseAudioContext as the common type for both AudioContext and OfflineAudioContext
+type AudioContextType = BaseAudioContext;
+
 // Class to handle EBU R128 loudness measurement
 class LoudnessAnalyzer {
-  private audioContext: AudioContext;
+  private audioContext: AudioContextType;
   private analyserNode: AnalyserNode;
   private gainNode: GainNode;
 
-  constructor(audioContext: AudioContext) {
+  constructor(audioContext: AudioContextType) {
     this.audioContext = audioContext;
     this.analyserNode = audioContext.createAnalyser();
     this.gainNode = audioContext.createGain();
@@ -88,14 +90,14 @@ class LoudnessAnalyzer {
 
 // Noise suppression processor
 class NoiseSuppressionProcessor {
-  private audioContext: AudioContext;
+  private audioContext: AudioContextType;
   private inputNode: GainNode;
   private outputNode: GainNode;
   private filterNode: BiquadFilterNode;
   private dynamicsNode: DynamicsCompressorNode;
   private amount: number;
   
-  constructor(audioContext: AudioContext, amount: number = 0.5) {
+  constructor(audioContext: AudioContextType, amount: number = 0.5) {
     this.audioContext = audioContext;
     this.amount = amount;
     
@@ -148,7 +150,7 @@ class NoiseSuppressionProcessor {
 
 // Content-aware processing engine
 class ContentAwareProcessor {
-  private audioContext: AudioContext;
+  private audioContext: AudioContextType;
   private inputNode: GainNode;
   private outputNode: GainNode;
   private eqLow: BiquadFilterNode;
@@ -157,7 +159,7 @@ class ContentAwareProcessor {
   private compressor: DynamicsCompressorNode;
   private mode: string;
   
-  constructor(audioContext: AudioContext, mode: string = "music") {
+  constructor(audioContext: AudioContextType, mode: string = "music") {
     this.audioContext = audioContext;
     this.mode = mode;
     
@@ -273,13 +275,13 @@ class ContentAwareProcessor {
 
 // Phase coherence processor
 class PhaseCoherenceProcessor {
-  private audioContext: AudioContext;
+  private audioContext: AudioContextType;
   private inputNode: GainNode;
   private outputNode: GainNode;
   private stereoEnhancer: StereoPannerNode;
   private midSideProcessor: ChannelSplitterNode;
   
-  constructor(audioContext: AudioContext) {
+  constructor(audioContext: AudioContextType) {
     this.audioContext = audioContext;
     
     // Create nodes
@@ -308,14 +310,14 @@ class PhaseCoherenceProcessor {
 
 // Rhythmic enhancement processor
 class RhythmicProcessor {
-  private audioContext: AudioContext;
+  private audioContext: AudioContextType;
   private inputNode: GainNode;
   private outputNode: GainNode;
   private compressor: DynamicsCompressorNode;
   private beatQuantizationAmount: number = 0;
   private preserveSwing: boolean = true;
   
-  constructor(audioContext: AudioContext) {
+  constructor(audioContext: AudioContextType) {
     this.audioContext = audioContext;
     
     // Create nodes
@@ -366,7 +368,7 @@ class RhythmicProcessor {
 
 // Main processing engine that combines all processors
 export class AudioMasteringEngine {
-  private audioContext?: AudioContext;
+  private audioContext?: AudioContextType;
   private sourceNode?: AudioBufferSourceNode;
   private gainNode?: GainNode;
   private loudnessAnalyzer?: LoudnessAnalyzer;
