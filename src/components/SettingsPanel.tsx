@@ -11,6 +11,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import {
+  ToggleGroup,
+  ToggleGroupItem
+} from "@/components/ui/toggle-group";
+import { Info } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface SettingsPanelProps {
   disabled?: boolean;
@@ -38,6 +44,9 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const [noiseReduction, setNoiseReduction] = useState([50]);
   const [preserveTempo, setPreserveTempo] = useState(true);
   const [preserveTone, setPreserveTone] = useState(true);
+  
+  // Beat correction mode
+  const [beatCorrectionMode, setBeatCorrectionMode] = useState("gentle");
 
   // Update parent component when settings change
   useEffect(() => {
@@ -135,9 +144,22 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
       
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <Label htmlFor="preserve-tempo" className="cursor-pointer">
-            Preserve Tempo & Rhythm
-          </Label>
+          <div className="flex items-center space-x-2">
+            <Label htmlFor="preserve-tempo" className="cursor-pointer">
+              Preserve Tempo & Rhythm
+            </Label>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Info className="h-4 w-4 text-moroder-primary/60" />
+                </TooltipTrigger>
+                <TooltipContent className="max-w-[300px]">
+                  Ensures the processed audio maintains its original tempo, time signature, 
+                  and rhythmic feel. Essential for preserving the musical integrity.
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
           <Switch
             id="preserve-tempo"
             disabled={disabled}
@@ -147,9 +169,22 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
         </div>
         
         <div className="flex items-center justify-between">
-          <Label htmlFor="preserve-tone" className="cursor-pointer">
-            Preserve Tone & Character
-          </Label>
+          <div className="flex items-center space-x-2">
+            <Label htmlFor="preserve-tone" className="cursor-pointer">
+              Preserve Tone & Character
+            </Label>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Info className="h-4 w-4 text-moroder-primary/60" />
+                </TooltipTrigger>
+                <TooltipContent className="max-w-[300px]">
+                  Maintains the original tonal qualities and sonic character of the audio 
+                  while still applying enhancement. Uses gentler processing techniques.
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
           <Switch
             id="preserve-tone"
             disabled={disabled}
@@ -164,8 +199,21 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
       {mode === "music" && (
         <div className="space-y-4">
           <div className="space-y-2">
-            <div className="flex justify-between">
-              <Label htmlFor="beat-quantization">Beat Quantization Strength</Label>
+            <div className="flex justify-between items-center">
+              <div className="flex items-center space-x-2">
+                <Label htmlFor="beat-quantization">Beat Correction Strength</Label>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="h-4 w-4 text-moroder-primary/60" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-[300px]">
+                      Gently aligns off-beat elements to the grid while preserving the 
+                      original audio character. Higher values apply stronger correction.
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
               <span className="text-sm text-muted-foreground">{beatQuantization[0]/100}</span>
             </div>
             <Slider
@@ -178,21 +226,70 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               onValueChange={setBeatQuantization}
               className="py-2"
             />
-            {!preserveTempo ? (
+            
+            {beatQuantization[0] > 0 && (
+              <div className="mt-2 space-y-2">
+                <Label className="text-sm">Beat Correction Mode</Label>
+                <ToggleGroup 
+                  type="single" 
+                  variant="outline"
+                  value={beatCorrectionMode}
+                  onValueChange={(value) => {
+                    if (value) setBeatCorrectionMode(value);
+                  }}
+                  className="justify-start"
+                >
+                  <ToggleGroupItem value="gentle" className="text-xs">
+                    Gentle
+                  </ToggleGroupItem>
+                  <ToggleGroupItem value="balanced" className="text-xs">
+                    Balanced
+                  </ToggleGroupItem>
+                  <ToggleGroupItem value="precise" className="text-xs">
+                    Precise
+                  </ToggleGroupItem>
+                </ToggleGroup>
+                <p className="text-xs text-muted-foreground italic">
+                  {beatCorrectionMode === "gentle" && 
+                    "Subtle correction that prioritizes preserving the original sound."}
+                  {beatCorrectionMode === "balanced" && 
+                    "Moderate correction with good sound preservation."}
+                  {beatCorrectionMode === "precise" && 
+                    "Strong correction that prioritizes rhythmic accuracy."}
+                </p>
+              </div>
+            )}
+            
+            {preserveTempo ? (
               <p className="text-xs text-muted-foreground italic">
-                Higher values quantize more strictly but may affect sound quality.
+                With Tempo Preservation enabled, beat correction will align elements while 
+                maintaining the original feel and timing of the music.
               </p>
             ) : (
-              <p className="text-xs text-muted-foreground italic">
-                Tempo preservation is enabled - beat quantization will be applied with sound preservation.
+              <p className="text-xs text-muted-foreground italic mt-1">
+                <span className="text-amber-400">Note:</span> Disabling Tempo Preservation 
+                may alter the original timing of the music.
               </p>
             )}
           </div>
           
           <div className="flex items-center justify-between">
-            <Label htmlFor="swing-preservation" className="cursor-pointer">
-              Swing Preservation
-            </Label>
+            <div className="flex items-center space-x-2">
+              <Label htmlFor="swing-preservation" className="cursor-pointer">
+                Preserve Groove & Swing
+              </Label>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-4 w-4 text-moroder-primary/60" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-[300px]">
+                    Maintains the natural groove and swing feel of the music when applying beat 
+                    correction. Ensures beats aren't over-quantized to a rigid grid.
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
             <Switch
               id="swing-preservation"
               disabled={disabled || beatQuantization[0] === 0}
@@ -201,7 +298,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
             />
           </div>
           <p className="text-xs text-muted-foreground italic">
-            When enabled, preserves the groove and feel while applying quantization.
+            Preserves the natural groove and feel of the music while correcting timing issues.
           </p>
         </div>
       )}

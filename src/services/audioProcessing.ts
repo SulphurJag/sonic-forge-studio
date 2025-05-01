@@ -1,4 +1,3 @@
-
 import { toast } from "@/hooks/use-toast";
 
 // Audio processing configuration types
@@ -11,6 +10,7 @@ export interface ProcessingSettings {
   swingPreservation?: boolean;
   preserveTempo: boolean;
   preserveTone: boolean;
+  beatCorrectionMode?: string;
 }
 
 export interface ProcessingResults {
@@ -351,6 +351,7 @@ class RhythmicProcessor {
   private beatQuantizationAmount: number = 0;
   private preserveSwing: boolean = true;
   private preserveTempo: boolean = true;
+  private correctionMode: string = "gentle";
   
   constructor(audioContext: AudioContextType, preserveTempo: boolean = true) {
     this.audioContext = audioContext;
@@ -380,51 +381,106 @@ class RhythmicProcessor {
     this.compressor.connect(this.outputNode);
   }
   
-  // Set beat quantization amount (0-1)
-  setBeatQuantization(amount: number, preserveSwing: boolean, preserveTempo: boolean): void {
+  // Set beat quantization amount (0-1) and correction mode
+  setBeatQuantization(amount: number, preserveSwing: boolean, preserveTempo: boolean, correctionMode: string = "gentle"): void {
     this.beatQuantizationAmount = Math.max(0, Math.min(1, amount));
     this.preserveSwing = preserveSwing;
     this.preserveTempo = preserveTempo;
+    this.correctionMode = correctionMode;
     
-    // Adjust the compressor settings based on preserveTempo
-    if (this.preserveTempo) {
-      // Sound-preserving mode - use gentler compressor settings
-      // that enhance transients without changing timing
-      this.compressor.threshold.value = -20;
-      this.compressor.ratio.value = 2 + (this.beatQuantizationAmount * 0.5); // 2-2.5 ratio
-      this.compressor.attack.value = 0.01; // Slower attack to preserve transients
-      this.compressor.release.value = 0.2;  // Slower release preserves the original groove better
-      
-      // Use enhancer to bring out transients without changing timing
-      this.enhancer.frequency.value = 1200;
-      this.enhancer.Q.value = 0.8;
-      this.enhancer.gain.value = this.beatQuantizationAmount * 2; // 0-2dB boost
-    } else {
-      // Traditional beat quantization with more aggressive settings
-      // Apply settings to compressor for transient shaping
-      this.compressor.threshold.value = -24;
-      this.compressor.ratio.value = 4;
-      
-      // Lower attack = more punch on transients
-      this.compressor.attack.value = 0.001 + (this.beatQuantizationAmount * 0.01);
-      
-      // Release affects groove and swing
-      if (this.preserveSwing) {
-        // Longer release preserves more of the original groove
-        this.compressor.release.value = 0.1 + (this.beatQuantizationAmount * 0.2);
-        // Enhance transients to create subtle timing feel
-        this.enhancer.frequency.value = 1800;
-        this.enhancer.Q.value = 1.2;
-        this.enhancer.gain.value = this.beatQuantizationAmount * 3; // 0-3dB boost
-      } else {
-        // Shorter release tightens timing more aggressively
-        this.compressor.release.value = 0.1 + (this.beatQuantizationAmount * 0.05);
-        // Different frequency focus for more rigid timing
-        this.enhancer.frequency.value = 2200; 
-        this.enhancer.Q.value = 1.5;
-        this.enhancer.gain.value = this.beatQuantizationAmount * 4; // 0-4dB boost
-      }
+    // Always prioritize preservation if enabled
+    const isPreserving = this.preserveTempo;
+    
+    // Base settings for each mode
+    let thresholdBase: number;
+    let ratioBase: number; 
+    let attackBase: number;
+    let releaseBase: number;
+    let enhancerFreq: number;
+    let enhancerQ: number;
+    let enhancerGainMultiplier: number;
+    
+    // Set parameters based on correction mode
+    switch (this.correctionMode) {
+      case "gentle":
+        thresholdBase = -20;
+        ratioBase = 2;
+        attackBase = 0.01;
+        releaseBase = 0.2;
+        enhancerFreq = 1000;
+        enhancerQ = 0.7;
+        enhancerGainMultiplier = 2;
+        break;
+        
+      case "balanced":
+        thresholdBase = -24;
+        ratioBase = 3;
+        attackBase = 0.005;
+        releaseBase = 0.15;
+        enhancerFreq = 1500;
+        enhancerQ = 1.0;
+        enhancerGainMultiplier = 3;
+        break;
+        
+      case "precise":
+        thresholdBase = -28;
+        ratioBase = 4;
+        attackBase = 0.003;
+        releaseBase = 0.1;
+        enhancerFreq = 2000;
+        enhancerQ = 1.3;
+        enhancerGainMultiplier = 4;
+        break;
+        
+      default: // fallback to gentle
+        thresholdBase = -20;
+        ratioBase = 2;
+        attackBase = 0.01;
+        releaseBase = 0.2;
+        enhancerFreq = 1000;
+        enhancerQ = 0.7;
+        enhancerGainMultiplier = 2;
     }
+    
+    // Apply preservation adjustments if needed
+    if (isPreserving) {
+      // In preservation mode, be more conservative with all settings
+      thresholdBase += 4; // Higher threshold = less compression
+      ratioBase = Math.max(1.5, ratioBase * 0.6); // Lower ratio = gentler compression
+      attackBase *= 1.5; // Slower attack = preserves more transients
+      releaseBase *= 1.5; // Slower release = more natural decay
+      enhancerGainMultiplier *= 0.7; // Less enhancement = more natural sound
+    }
+    
+    // Apply swing preservation adjustments
+    if (this.preserveSwing) {
+      // Gentler release preserves groove
+      releaseBase *= 1.3;
+    }
+    
+    // Set the adjusted compressor settings
+    this.compressor.threshold.value = thresholdBase;
+    this.compressor.ratio.value = ratioBase + (this.beatQuantizationAmount * 0.5); // slight ratio increase with quantization
+    this.compressor.attack.value = attackBase;
+    this.compressor.release.value = releaseBase;
+    
+    // Set the enhancer settings
+    this.enhancer.frequency.value = enhancerFreq;
+    this.enhancer.Q.value = enhancerQ;
+    this.enhancer.gain.value = this.beatQuantizationAmount * enhancerGainMultiplier;
+    
+    // console.log("Beat quantization settings:", {
+    //   correctionMode: this.correctionMode,
+    //   preserveTempo: this.preserveTempo,
+    //   preserveSwing: this.preserveSwing,
+    //   amount: this.beatQuantizationAmount,
+    //   thresholdBase,
+    //   ratio: this.compressor.ratio.value,
+    //   attack: this.compressor.attack.value,
+    //   release: this.compressor.release.value,
+    //   enhancerFreq: this.enhancer.frequency.value,
+    //   enhancerGain: this.enhancer.gain.value
+    // });
   }
   
   // Connect to audio source
@@ -539,6 +595,9 @@ export class AudioMasteringEngine {
     
     console.log("Creating offline context for processing");
     
+    // Extract beat correction mode from settings if available
+    const beatCorrectionMode = (settings as any).beatCorrectionMode || "gentle";
+    
     // Create offline context for processing
     const offlineContext = new OfflineAudioContext(
       this.originalBuffer.numberOfChannels,
@@ -553,7 +612,8 @@ export class AudioMasteringEngine {
     console.log("Setting up audio processing chain with preservation settings:", {
       preserveTempo: settings.preserveTempo ?? true,
       preserveTone: settings.preserveTone ?? true,
-      swingPreservation: settings.swingPreservation ?? true
+      swingPreservation: settings.swingPreservation ?? true,
+      beatCorrectionMode
     });
     
     // Setup processors with preservation settings
@@ -579,7 +639,8 @@ export class AudioMasteringEngine {
       rhythmicProcessor.setBeatQuantization(
         settings.beatQuantization / 100,
         settings.swingPreservation || true,
-        settings.preserveTempo ?? true
+        settings.preserveTempo ?? true,
+        beatCorrectionMode
       );
     }
     

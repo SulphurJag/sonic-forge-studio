@@ -27,7 +27,7 @@ const Index = () => {
   const [currentTime, setCurrentTime] = useState(0);
   const [audioDuration, setAudioDuration] = useState(0);
   
-  // Updated processing settings with preservation options
+  // Updated processing settings with preservation options and beat correction mode
   const [processingSettings, setProcessingSettings] = useState({
     mode: "music",
     targetLufs: -14,
@@ -36,7 +36,8 @@ const Index = () => {
     beatQuantization: 0,
     swingPreservation: true,
     preserveTempo: true,   // New setting for tempo preservation
-    preserveTone: true     // New setting for tone preservation
+    preserveTone: true,     // New setting for tone preservation
+    beatCorrectionMode: "gentle"  // New setting for beat correction mode
   });
   
   // Processed audio file reference
@@ -217,7 +218,12 @@ const Index = () => {
   
   // Handler for settings panel changes
   const handleSettingsChange = (settings: any) => {
-    setProcessingSettings(settings);
+    // Keep track of the beat correction mode if it's passed from the SettingsPanel
+    const updatedSettings = {
+      ...settings,
+      beatCorrectionMode: settings.beatCorrectionMode || processingSettings.beatCorrectionMode
+    };
+    setProcessingSettings(updatedSettings);
   };
   
   return (
