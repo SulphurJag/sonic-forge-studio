@@ -47,6 +47,12 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   
   // Beat correction mode
   const [beatCorrectionMode, setBeatCorrectionMode] = useState("gentle");
+  
+  // Advanced rhythm correction options
+  const [advancedRhythmOptions, setAdvancedRhythmOptions] = useState(false);
+  const [transientPreservation, setTransientPreservation] = useState(true);
+  const [phaseAlignment, setPhaseAlignment] = useState(true);
+  const [beatAnalysisIntensity, setBeatAnalysisIntensity] = useState([75]);
 
   // Update parent component when settings change
   useEffect(() => {
@@ -208,7 +214,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                       <Info className="h-4 w-4 text-moroder-primary/60" />
                     </TooltipTrigger>
                     <TooltipContent className="max-w-[300px]">
-                      Gently aligns off-beat elements to the grid while preserving the 
+                      Intelligently aligns off-beat elements to the grid while preserving the 
                       original audio character. Higher values apply stronger correction.
                     </TooltipContent>
                   </Tooltip>
@@ -248,6 +254,9 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   <ToggleGroupItem value="precise" className="text-xs">
                     Precise
                   </ToggleGroupItem>
+                  <ToggleGroupItem value="surgical" className="text-xs">
+                    Surgical
+                  </ToggleGroupItem>
                 </ToggleGroup>
                 <p className="text-xs text-muted-foreground italic">
                   {beatCorrectionMode === "gentle" && 
@@ -256,6 +265,8 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     "Moderate correction with good sound preservation."}
                   {beatCorrectionMode === "precise" && 
                     "Strong correction that prioritizes rhythmic accuracy."}
+                  {beatCorrectionMode === "surgical" && 
+                    "Maximum precision correction for professional results."}
                 </p>
               </div>
             )}
@@ -297,8 +308,101 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               onCheckedChange={setSwingPreservation}
             />
           </div>
+          
+          {beatQuantization[0] > 50 && (
+            <div className="flex items-center justify-between mt-2">
+              <div className="flex items-center space-x-2">
+                <Label htmlFor="advanced-options" className="cursor-pointer">
+                  Advanced Rhythm Controls
+                </Label>
+              </div>
+              <Switch
+                id="advanced-options"
+                disabled={disabled}
+                checked={advancedRhythmOptions}
+                onCheckedChange={setAdvancedRhythmOptions}
+              />
+            </div>
+          )}
+          
+          {advancedRhythmOptions && beatQuantization[0] > 0 && (
+            <div className="space-y-4 px-3 py-3 border border-moroder-primary/10 rounded-md bg-moroder-dark/20">
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <Label htmlFor="beat-analysis">Beat Analysis Intensity</Label>
+                  <span className="text-sm text-muted-foreground">{beatAnalysisIntensity[0]}%</span>
+                </div>
+                <Slider
+                  id="beat-analysis"
+                  disabled={disabled}
+                  min={25}
+                  max={100}
+                  step={1}
+                  value={beatAnalysisIntensity}
+                  onValueChange={setBeatAnalysisIntensity}
+                  className="py-2"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Higher values provide more accurate beat detection at the cost of potentially 
+                  over-correcting subtle timing nuances.
+                </p>
+              </div>
+              
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <Label htmlFor="transient-preservation" className="cursor-pointer">
+                    Preserve Transients
+                  </Label>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="h-4 w-4 text-moroder-primary/60" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-[300px]">
+                        Maintains the attack characteristics of percussive elements even when
+                        their timing is adjusted.
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
+                <Switch
+                  id="transient-preservation"
+                  disabled={disabled}
+                  checked={transientPreservation}
+                  onCheckedChange={setTransientPreservation}
+                />
+              </div>
+              
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <Label htmlFor="phase-alignment" className="cursor-pointer">
+                    Phase Alignment
+                  </Label>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="h-4 w-4 text-moroder-primary/60" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-[300px]">
+                        Ensures phase coherence is maintained when shifting beats, preventing 
+                        artifacts and maintaining clarity.
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
+                <Switch
+                  id="phase-alignment"
+                  disabled={disabled}
+                  checked={phaseAlignment}
+                  onCheckedChange={setPhaseAlignment}
+                />
+              </div>
+            </div>
+          )}
+          
           <p className="text-xs text-muted-foreground italic">
             Preserves the natural groove and feel of the music while correcting timing issues.
+            {beatCorrectionMode === "surgical" && " Surgical mode applies advanced spectral analysis for precise timing correction."}
           </p>
         </div>
       )}

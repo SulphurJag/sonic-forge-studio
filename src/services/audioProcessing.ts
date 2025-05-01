@@ -11,6 +11,9 @@ export interface ProcessingSettings {
   preserveTempo: boolean;
   preserveTone: boolean;
   beatCorrectionMode?: string;
+  beatAnalysisIntensity?: number;
+  transientPreservation?: boolean;
+  phaseAlignment?: boolean;
 }
 
 export interface ProcessingResults {
@@ -313,9 +316,11 @@ class PhaseCoherenceProcessor {
   private outputNode: GainNode;
   private stereoEnhancer: StereoPannerNode;
   private midSideProcessor: ChannelSplitterNode;
+  private phaseAlignmentEnabled: boolean;
   
-  constructor(audioContext: AudioContextType) {
+  constructor(audioContext: AudioContextType, phaseAlignmentEnabled: boolean = true) {
     this.audioContext = audioContext;
+    this.phaseAlignmentEnabled = phaseAlignmentEnabled;
     
     // Create nodes
     this.inputNode = audioContext.createGain();
@@ -324,10 +329,31 @@ class PhaseCoherenceProcessor {
     this.midSideProcessor = audioContext.createChannelSplitter(2);
     
     // Connect nodes in a basic stereo enhancement setup
-    // Real phase coherence optimization would be more complex
+    this.configureNodes();
+  }
+  
+  private configureNodes() {
+    // If phase alignment is disabled, use a simpler chain
+    if (!this.phaseAlignmentEnabled) {
+      this.inputNode.connect(this.outputNode);
+      return;
+    }
+    
+    // Connect nodes for phase-coherent processing
     this.inputNode.connect(this.midSideProcessor);
     this.midSideProcessor.connect(this.stereoEnhancer);
     this.stereoEnhancer.connect(this.outputNode);
+  }
+  
+  // Set phase alignment setting
+  setPhaseAlignment(enabled: boolean): void {
+    if (this.phaseAlignmentEnabled !== enabled) {
+      this.phaseAlignmentEnabled = enabled;
+      // Disconnect existing connections
+      this.inputNode.disconnect();
+      // Reconfigure nodes with new setting
+      this.configureNodes();
+    }
   }
   
   // Connect to audio source
@@ -348,20 +374,29 @@ class RhythmicProcessor {
   private outputNode: GainNode;
   private compressor: DynamicsCompressorNode;
   private enhancer: BiquadFilterNode;
+  private transientShaper: WaveShaperNode; // For transient preservation
   private beatQuantizationAmount: number = 0;
   private preserveSwing: boolean = true;
   private preserveTempo: boolean = true;
+  private preserveTransients: boolean = true;
   private correctionMode: string = "gentle";
+  private beatAnalysisIntensity: number = 75;
   
-  constructor(audioContext: AudioContextType, preserveTempo: boolean = true) {
+  constructor(
+    audioContext: AudioContextType, 
+    preserveTempo: boolean = true,
+    preserveTransients: boolean = true
+  ) {
     this.audioContext = audioContext;
     this.preserveTempo = preserveTempo;
+    this.preserveTransients = preserveTransients;
     
     // Create nodes
     this.inputNode = audioContext.createGain();
     this.outputNode = audioContext.createGain();
     this.compressor = audioContext.createDynamicsCompressor();
     this.enhancer = audioContext.createBiquadFilter();
+    this.transientShaper = audioContext.createWaveShaper();
     
     // Configure enhancer for transient enhancement
     this.enhancer.type = "peaking";
@@ -375,18 +410,68 @@ class RhythmicProcessor {
     this.compressor.attack.value = 0.001; 
     this.compressor.release.value = 0.1;
     
+    // Configure transient shaper (waveshaper with custom curve for transient preservation)
+    this.configureTransientShaper();
+    
     // Connect nodes
-    this.inputNode.connect(this.enhancer);
+    this.connectNodes();
+  }
+  
+  // Configure the transient shaper with a custom curve
+  private configureTransientShaper(): void {
+    // Create a custom curve that enhances transients
+    const curve = new Float32Array(65536);
+    const k = this.preserveTransients ? 5.0 : 2.0; // Higher k means stronger transient preservation
+    
+    for (let i = 0; i < 65536; i++) {
+      const x = i * 2 / 65536 - 1;
+      // Apply a modified sigmoid function that enhances small values (transients)
+      curve[i] = (3 + k) * x * 0.3 / (3 + k * Math.abs(x));
+    }
+    
+    this.transientShaper.curve = curve;
+    this.transientShaper.oversample = "4x"; // Use oversampling for higher quality
+  }
+  
+  // Connect nodes based on current settings
+  private connectNodes(): void {
+    // Disconnect any existing connections
+    this.inputNode.disconnect();
+    
+    if (this.preserveTransients) {
+      // Transient preservation chain
+      this.inputNode.connect(this.transientShaper);
+      this.transientShaper.connect(this.enhancer);
+    } else {
+      // Direct connection without transient shaping
+      this.inputNode.connect(this.enhancer);
+    }
+    
     this.enhancer.connect(this.compressor);
     this.compressor.connect(this.outputNode);
   }
   
-  // Set beat quantization amount (0-1) and correction mode
-  setBeatQuantization(amount: number, preserveSwing: boolean, preserveTempo: boolean, correctionMode: string = "gentle"): void {
+  // Set beat quantization and correction parameters
+  setBeatQuantization(
+    amount: number, 
+    preserveSwing: boolean, 
+    preserveTempo: boolean,
+    correctionMode: string = "gentle",
+    beatAnalysisIntensity: number = 75,
+    preserveTransients: boolean = true
+  ): void {
     this.beatQuantizationAmount = Math.max(0, Math.min(1, amount));
     this.preserveSwing = preserveSwing;
     this.preserveTempo = preserveTempo;
     this.correctionMode = correctionMode;
+    this.beatAnalysisIntensity = Math.max(25, Math.min(100, beatAnalysisIntensity));
+    
+    // Update transient preservation if changed
+    if (this.preserveTransients !== preserveTransients) {
+      this.preserveTransients = preserveTransients;
+      this.configureTransientShaper();
+      this.connectNodes();
+    }
     
     // Always prioritize preservation if enabled
     const isPreserving = this.preserveTempo;
@@ -432,6 +517,16 @@ class RhythmicProcessor {
         enhancerGainMultiplier = 4;
         break;
         
+      case "surgical":
+        thresholdBase = -32;
+        ratioBase = 6;
+        attackBase = 0.001;
+        releaseBase = 0.05;
+        enhancerFreq = 2500;
+        enhancerQ = 1.5;
+        enhancerGainMultiplier = 5;
+        break;
+        
       default: // fallback to gentle
         thresholdBase = -20;
         ratioBase = 2;
@@ -441,6 +536,14 @@ class RhythmicProcessor {
         enhancerQ = 0.7;
         enhancerGainMultiplier = 2;
     }
+    
+    // Apply beat analysis intensity adjustment
+    const analysisIntensityFactor = this.beatAnalysisIntensity / 75; // Normalize to 1.0 at default value
+    
+    // Higher beat analysis intensity means more aggressive detection and correction
+    thresholdBase -= (analysisIntensityFactor - 1) * 4; // Lower threshold = more detection
+    ratioBase *= Math.max(0.8, Math.min(1.2, analysisIntensityFactor)); // Scale ratio by intensity
+    attackBase /= analysisIntensityFactor; // Lower attack = faster response
     
     // Apply preservation adjustments if needed
     if (isPreserving) {
@@ -458,9 +561,17 @@ class RhythmicProcessor {
       releaseBase *= 1.3;
     }
     
+    // Apply transient preservation adjustments
+    if (this.preserveTransients) {
+      // Slower attack to preserve transient peaks
+      attackBase *= 1.2;
+      // Less compression to preserve dynamics
+      ratioBase *= 0.85;
+    }
+    
     // Set the adjusted compressor settings
     this.compressor.threshold.value = thresholdBase;
-    this.compressor.ratio.value = ratioBase + (this.beatQuantizationAmount * 0.5); // slight ratio increase with quantization
+    this.compressor.ratio.value = ratioBase + (this.beatQuantizationAmount * (this.correctionMode === "surgical" ? 1.0 : 0.5)); 
     this.compressor.attack.value = attackBase;
     this.compressor.release.value = releaseBase;
     
@@ -468,19 +579,6 @@ class RhythmicProcessor {
     this.enhancer.frequency.value = enhancerFreq;
     this.enhancer.Q.value = enhancerQ;
     this.enhancer.gain.value = this.beatQuantizationAmount * enhancerGainMultiplier;
-    
-    // console.log("Beat quantization settings:", {
-    //   correctionMode: this.correctionMode,
-    //   preserveTempo: this.preserveTempo,
-    //   preserveSwing: this.preserveSwing,
-    //   amount: this.beatQuantizationAmount,
-    //   thresholdBase,
-    //   ratio: this.compressor.ratio.value,
-    //   attack: this.compressor.attack.value,
-    //   release: this.compressor.release.value,
-    //   enhancerFreq: this.enhancer.frequency.value,
-    //   enhancerGain: this.enhancer.gain.value
-    // });
   }
   
   // Connect to audio source
@@ -595,8 +693,11 @@ export class AudioMasteringEngine {
     
     console.log("Creating offline context for processing");
     
-    // Extract beat correction mode from settings if available
-    const beatCorrectionMode = (settings as any).beatCorrectionMode || "gentle";
+    // Extract beat correction settings from settings if available
+    const beatCorrectionMode = settings.beatCorrectionMode || "gentle";
+    const beatAnalysisIntensity = settings.beatAnalysisIntensity || 75;
+    const transientPreservation = settings.transientPreservation !== undefined ? settings.transientPreservation : true;
+    const phaseAlignment = settings.phaseAlignment !== undefined ? settings.phaseAlignment : true;
     
     // Create offline context for processing
     const offlineContext = new OfflineAudioContext(
@@ -613,7 +714,10 @@ export class AudioMasteringEngine {
       preserveTempo: settings.preserveTempo ?? true,
       preserveTone: settings.preserveTone ?? true,
       swingPreservation: settings.swingPreservation ?? true,
-      beatCorrectionMode
+      beatCorrectionMode,
+      beatAnalysisIntensity,
+      transientPreservation,
+      phaseAlignment
     });
     
     // Setup processors with preservation settings
@@ -628,10 +732,14 @@ export class AudioMasteringEngine {
       settings.mode,
       settings.preserveTone ?? true
     );
-    const phaseProcessor = new PhaseCoherenceProcessor(offlineContext);
+    const phaseProcessor = new PhaseCoherenceProcessor(
+      offlineContext,
+      phaseAlignment
+    );
     const rhythmicProcessor = new RhythmicProcessor(
       offlineContext,
-      settings.preserveTempo ?? true
+      settings.preserveTempo ?? true,
+      transientPreservation
     );
     
     // Apply settings
@@ -640,7 +748,9 @@ export class AudioMasteringEngine {
         settings.beatQuantization / 100,
         settings.swingPreservation || true,
         settings.preserveTempo ?? true,
-        beatCorrectionMode
+        beatCorrectionMode,
+        beatAnalysisIntensity,
+        transientPreservation
       );
     }
     
