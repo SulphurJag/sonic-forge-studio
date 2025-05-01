@@ -26,13 +26,17 @@ const Index = () => {
   const [processProgress, setProcessProgress] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const [audioDuration, setAudioDuration] = useState(0);
+  
+  // Updated processing settings with preservation options
   const [processingSettings, setProcessingSettings] = useState({
     mode: "music",
     targetLufs: -14,
     dryWet: 100,
     noiseReduction: 50,
     beatQuantization: 0,
-    swingPreservation: true
+    swingPreservation: true,
+    preserveTempo: true,   // New setting for tempo preservation
+    preserveTone: true     // New setting for tone preservation
   });
   
   // Processed audio file reference
@@ -259,6 +263,7 @@ const Index = () => {
                     <li>Content-Aware Processing Engine</li>
                     <li>Phase Coherence Optimization</li>
                     <li>Rhythmic Enhancement & Artifact Elimination</li>
+                    <li>Original Character Preservation</li>
                   </ul>
                 </CardContent>
               </Card>

@@ -8,6 +8,8 @@ export interface ProcessingSettings {
   noiseReduction: number;
   beatQuantization?: number;
   swingPreservation?: boolean;
+  preserveTempo: boolean;
+  preserveTone: boolean;
 }
 
 export interface ProcessingResults {
@@ -96,10 +98,12 @@ class NoiseSuppressionProcessor {
   private filterNode: BiquadFilterNode;
   private dynamicsNode: DynamicsCompressorNode;
   private amount: number;
+  private preserveTone: boolean;
   
-  constructor(audioContext: AudioContextType, amount: number = 0.5) {
+  constructor(audioContext: AudioContextType, amount: number = 0.5, preserveTone: boolean = true) {
     this.audioContext = audioContext;
     this.amount = amount;
+    this.preserveTone = preserveTone;
     
     // Create nodes
     this.inputNode = audioContext.createGain();
@@ -107,15 +111,7 @@ class NoiseSuppressionProcessor {
     this.filterNode = audioContext.createBiquadFilter();
     this.dynamicsNode = audioContext.createDynamicsCompressor();
     
-    // Configure filter (high pass to remove low frequency noise)
-    this.filterNode.type = "highpass";
-    this.filterNode.frequency.value = 100 * this.amount; // Scales with amount
-    
-    // Configure dynamics compressor (for reducing noise floor)
-    this.dynamicsNode.threshold.value = -50 + (20 * (1 - this.amount));
-    this.dynamicsNode.ratio.value = 12;
-    this.dynamicsNode.attack.value = 0.003;
-    this.dynamicsNode.release.value = 0.25;
+    this.configureNodes();
     
     // Connect nodes
     this.inputNode.connect(this.filterNode);
@@ -123,11 +119,36 @@ class NoiseSuppressionProcessor {
     this.dynamicsNode.connect(this.outputNode);
   }
   
+  private configureNodes() {
+    // Configure filter (high pass to remove low frequency noise)
+    this.filterNode.type = "highpass";
+    
+    if (this.preserveTone) {
+      // Gentler settings when preserving tone
+      this.filterNode.frequency.value = 80 * this.amount; // Lower cutoff frequency
+      
+      // Configure dynamics compressor (for reducing noise floor)
+      this.dynamicsNode.threshold.value = -60 + (30 * (1 - this.amount));
+      this.dynamicsNode.ratio.value = Math.min(6, 4 + (this.amount * 4)); // Lower ratio
+      this.dynamicsNode.attack.value = 0.01; // Slower attack
+      this.dynamicsNode.release.value = 0.3; // Slower release
+    } else {
+      // Original stronger settings
+      this.filterNode.frequency.value = 100 * this.amount;
+      
+      // Configure dynamics compressor (for reducing noise floor)
+      this.dynamicsNode.threshold.value = -50 + (20 * (1 - this.amount));
+      this.dynamicsNode.ratio.value = 12;
+      this.dynamicsNode.attack.value = 0.003;
+      this.dynamicsNode.release.value = 0.25;
+    }
+  }
+  
   // Set the amount of noise reduction (0-1)
-  setAmount(amount: number): void {
+  setAmount(amount: number, preserveTone: boolean = true): void {
     this.amount = Math.max(0, Math.min(1, amount));
-    this.filterNode.frequency.value = 100 * this.amount;
-    this.dynamicsNode.threshold.value = -50 + (20 * (1 - this.amount));
+    this.preserveTone = preserveTone;
+    this.configureNodes();
   }
   
   // Connect to audio source
@@ -144,7 +165,7 @@ class NoiseSuppressionProcessor {
   estimateNoiseReduction(): number {
     // Simplified estimation based on settings
     // Real implementation would analyze before/after spectra
-    return this.amount * 10; // up to 10 dB of reduction
+    return this.preserveTone ? this.amount * 6 : this.amount * 10; // up to 6 or 10 dB of reduction
   }
 }
 
@@ -158,10 +179,12 @@ class ContentAwareProcessor {
   private eqHigh: BiquadFilterNode;
   private compressor: DynamicsCompressorNode;
   private mode: string;
+  private preserveTone: boolean;
   
-  constructor(audioContext: AudioContextType, mode: string = "music") {
+  constructor(audioContext: AudioContextType, mode: string = "music", preserveTone: boolean = true) {
     this.audioContext = audioContext;
     this.mode = mode;
+    this.preserveTone = preserveTone;
     
     // Create nodes
     this.inputNode = audioContext.createGain();
@@ -194,72 +217,81 @@ class ContentAwareProcessor {
     this.eqMid.type = "peaking";
     this.eqHigh.type = "highshelf";
     
+    // If preserving tone, use much gentler settings
+    const tonePreservationFactor = this.preserveTone ? 0.3 : 1.0;
+    
     switch (mode) {
       case "podcast":
         // Enhance vocals, reduce boominess
         this.eqLow.frequency.value = 200;
-        this.eqLow.gain.value = -2;
+        this.eqLow.gain.value = -2 * tonePreservationFactor;
         this.eqMid.frequency.value = 2500;
         this.eqMid.Q.value = 1;
-        this.eqMid.gain.value = 3;
+        this.eqMid.gain.value = 3 * tonePreservationFactor;
         this.eqHigh.frequency.value = 8000;
-        this.eqHigh.gain.value = 1;
-        // Stronger compression for voice
+        this.eqHigh.gain.value = 1 * tonePreservationFactor;
+        // Compression for voice
         this.compressor.threshold.value = -20;
-        this.compressor.ratio.value = 4;
-        this.compressor.attack.value = 0.003;
-        this.compressor.release.value = 0.25;
+        this.compressor.ratio.value = 2 + (2 * tonePreservationFactor); // 2-4
+        this.compressor.attack.value = this.preserveTone ? 0.01 : 0.003;
+        this.compressor.release.value = this.preserveTone ? 0.35 : 0.25;
         break;
         
       case "vocal":
         // Enhance vocals for music
         this.eqLow.frequency.value = 100;
-        this.eqLow.gain.value = -1;
+        this.eqLow.gain.value = -1 * tonePreservationFactor;
         this.eqMid.frequency.value = 3000;
         this.eqMid.Q.value = 1.5;
-        this.eqMid.gain.value = 2;
+        this.eqMid.gain.value = 2 * tonePreservationFactor;
         this.eqHigh.frequency.value = 10000;
-        this.eqHigh.gain.value = 1.5;
+        this.eqHigh.gain.value = 1.5 * tonePreservationFactor;
         // Moderate compression for vocals
         this.compressor.threshold.value = -24;
-        this.compressor.ratio.value = 3;
-        this.compressor.attack.value = 0.001;
-        this.compressor.release.value = 0.2;
+        this.compressor.ratio.value = 1.5 + (1.5 * tonePreservationFactor); // 1.5-3
+        this.compressor.attack.value = this.preserveTone ? 0.005 : 0.001;
+        this.compressor.release.value = this.preserveTone ? 0.3 : 0.2;
         break;
         
       case "instrumental":
         // Enhance instruments
         this.eqLow.frequency.value = 100;
-        this.eqLow.gain.value = 1;
+        this.eqLow.gain.value = 1 * tonePreservationFactor;
         this.eqMid.frequency.value = 1000;
         this.eqMid.Q.value = 1;
         this.eqMid.gain.value = 0;
         this.eqHigh.frequency.value = 8000;
-        this.eqHigh.gain.value = 2;
+        this.eqHigh.gain.value = 2 * tonePreservationFactor;
         // Light compression for instruments
         this.compressor.threshold.value = -18;
-        this.compressor.ratio.value = 2.5;
-        this.compressor.attack.value = 0.005;
-        this.compressor.release.value = 0.15;
+        this.compressor.ratio.value = 1.5 + (1 * tonePreservationFactor); // 1.5-2.5
+        this.compressor.attack.value = this.preserveTone ? 0.01 : 0.005;
+        this.compressor.release.value = this.preserveTone ? 0.25 : 0.15;
         break;
         
       case "music":
       default:
         // Balanced music master
         this.eqLow.frequency.value = 120;
-        this.eqLow.gain.value = 1.5;
+        this.eqLow.gain.value = 1.5 * tonePreservationFactor;
         this.eqMid.frequency.value = 1500;
         this.eqMid.Q.value = 0.8;
         this.eqMid.gain.value = 0;
         this.eqHigh.frequency.value = 8000;
-        this.eqHigh.gain.value = 1.5;
+        this.eqHigh.gain.value = 1.5 * tonePreservationFactor;
         // Standard music compression
         this.compressor.threshold.value = -24;
-        this.compressor.ratio.value = 2;
-        this.compressor.attack.value = 0.003;
-        this.compressor.release.value = 0.1;
+        this.compressor.ratio.value = 1.3 + (0.7 * tonePreservationFactor); // 1.3-2
+        this.compressor.attack.value = this.preserveTone ? 0.01 : 0.003;
+        this.compressor.release.value = this.preserveTone ? 0.2 : 0.1;
         break;
     }
+  }
+  
+  // Set preserve tone option
+  setPreserveTone(preserve: boolean): void {
+    this.preserveTone = preserve;
+    this.configureForMode(this.mode);
   }
   
   // Connect to audio source
@@ -316,9 +348,11 @@ class RhythmicProcessor {
   private compressor: DynamicsCompressorNode;
   private beatQuantizationAmount: number = 0;
   private preserveSwing: boolean = true;
+  private preserveTempo: boolean = true;
   
-  constructor(audioContext: AudioContextType) {
+  constructor(audioContext: AudioContextType, preserveTempo: boolean = true) {
     this.audioContext = audioContext;
+    this.preserveTempo = preserveTempo;
     
     // Create nodes
     this.inputNode = audioContext.createGain();
@@ -337,21 +371,32 @@ class RhythmicProcessor {
   }
   
   // Set beat quantization amount (0-1)
-  setBeatQuantization(amount: number, preserveSwing: boolean): void {
-    this.beatQuantizationAmount = Math.max(0, Math.min(1, amount));
+  setBeatQuantization(amount: number, preserveSwing: boolean, preserveTempo: boolean): void {
+    // If preserveTempo is true, we essentially disable beat quantization by setting to 0
+    this.beatQuantizationAmount = preserveTempo ? 0 : Math.max(0, Math.min(1, amount));
     this.preserveSwing = preserveSwing;
+    this.preserveTempo = preserveTempo;
     
-    // Apply settings to compressor for transient shaping
-    // Lower attack = more punch on transients
-    this.compressor.attack.value = 0.001 + (this.beatQuantizationAmount * 0.01);
-    
-    // Release affects groove and swing
-    if (this.preserveSwing) {
-      // Longer release preserves more of the original groove
-      this.compressor.release.value = 0.1 + (this.beatQuantizationAmount * 0.2);
+    // If preserving tempo, use extremely light settings that only enhance transients
+    // without affecting timing
+    if (this.preserveTempo) {
+      // Very light transient enhancement that doesn't affect timing
+      this.compressor.attack.value = 0.005; // Slower attack to avoid changing transients too much
+      this.compressor.release.value = 0.2;  // Slower release to preserve original sound
+      this.compressor.ratio.value = 2;      // Lower ratio for gentler effect
     } else {
-      // Shorter release tightens timing more aggressively
-      this.compressor.release.value = 0.1 + (this.beatQuantizationAmount * 0.05);
+      // Apply settings to compressor for transient shaping
+      // Lower attack = more punch on transients
+      this.compressor.attack.value = 0.001 + (this.beatQuantizationAmount * 0.01);
+      
+      // Release affects groove and swing
+      if (this.preserveSwing) {
+        // Longer release preserves more of the original groove
+        this.compressor.release.value = 0.1 + (this.beatQuantizationAmount * 0.2);
+      } else {
+        // Shorter release tightens timing more aggressively
+        this.compressor.release.value = 0.1 + (this.beatQuantizationAmount * 0.05);
+      }
     }
   }
   
@@ -478,20 +523,36 @@ export class AudioMasteringEngine {
     const sourceNode = offlineContext.createBufferSource();
     sourceNode.buffer = this.originalBuffer;
     
-    console.log("Setting up audio processing chain");
+    console.log("Setting up audio processing chain with preservation settings:", {
+      preserveTempo: settings.preserveTempo ?? true,
+      preserveTone: settings.preserveTone ?? true,
+      swingPreservation: settings.swingPreservation ?? true
+    });
     
-    // Setup processors
+    // Setup processors with preservation settings
     const loudnessAnalyzer = new LoudnessAnalyzer(offlineContext);
-    const noiseProcessor = new NoiseSuppressionProcessor(offlineContext, settings.noiseReduction / 100);
-    const contentProcessor = new ContentAwareProcessor(offlineContext, settings.mode);
+    const noiseProcessor = new NoiseSuppressionProcessor(
+      offlineContext, 
+      settings.noiseReduction / 100,
+      settings.preserveTone ?? true
+    );
+    const contentProcessor = new ContentAwareProcessor(
+      offlineContext, 
+      settings.mode,
+      settings.preserveTone ?? true
+    );
     const phaseProcessor = new PhaseCoherenceProcessor(offlineContext);
-    const rhythmicProcessor = new RhythmicProcessor(offlineContext);
+    const rhythmicProcessor = new RhythmicProcessor(
+      offlineContext,
+      settings.preserveTempo ?? true
+    );
     
     // Apply settings
     if (settings.beatQuantization !== undefined) {
       rhythmicProcessor.setBeatQuantization(
         settings.beatQuantization / 100,
-        settings.swingPreservation || false
+        settings.swingPreservation || true,
+        settings.preserveTempo ?? true
       );
     }
     

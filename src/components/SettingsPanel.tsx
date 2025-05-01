@@ -21,6 +21,8 @@ interface SettingsPanelProps {
     noiseReduction: number;
     beatQuantization: number;
     swingPreservation: boolean;
+    preserveTempo: boolean;
+    preserveTone: boolean;
   }) => void;
 }
 
@@ -34,6 +36,8 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const [beatQuantization, setBeatQuantization] = useState([0]);
   const [swingPreservation, setSwingPreservation] = useState(true);
   const [noiseReduction, setNoiseReduction] = useState([50]);
+  const [preserveTempo, setPreserveTempo] = useState(true);
+  const [preserveTone, setPreserveTone] = useState(true);
 
   // Update parent component when settings change
   useEffect(() => {
@@ -44,10 +48,12 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
         dryWet: dryWet[0],
         noiseReduction: noiseReduction[0],
         beatQuantization: beatQuantization[0],
-        swingPreservation
+        swingPreservation,
+        preserveTempo,
+        preserveTone
       });
     }
-  }, [mode, targetLufs, dryWet, beatQuantization, swingPreservation, noiseReduction, onSettingsChange]);
+  }, [mode, targetLufs, dryWet, beatQuantization, swingPreservation, noiseReduction, preserveTempo, preserveTone, onSettingsChange]);
 
   return (
     <div className={`space-y-6 ${disabled ? 'opacity-70' : ''}`}>
@@ -127,6 +133,34 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
       
       <Separator className="bg-moroder-primary/20" />
       
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <Label htmlFor="preserve-tempo" className="cursor-pointer">
+            Preserve Tempo & Rhythm
+          </Label>
+          <Switch
+            id="preserve-tempo"
+            disabled={disabled}
+            checked={preserveTempo}
+            onCheckedChange={setPreserveTempo}
+          />
+        </div>
+        
+        <div className="flex items-center justify-between">
+          <Label htmlFor="preserve-tone" className="cursor-pointer">
+            Preserve Tone & Character
+          </Label>
+          <Switch
+            id="preserve-tone"
+            disabled={disabled}
+            checked={preserveTone}
+            onCheckedChange={setPreserveTone}
+          />
+        </div>
+      </div>
+      
+      <Separator className="bg-moroder-primary/20" />
+      
       {mode === "music" && (
         <div className="space-y-4">
           <div className="space-y-2">
@@ -136,7 +170,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
             </div>
             <Slider
               id="beat-quantization"
-              disabled={disabled}
+              disabled={disabled || preserveTempo}
               min={0}
               max={100}
               step={1}
@@ -144,6 +178,11 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               onValueChange={setBeatQuantization}
               className="py-2"
             />
+            {preserveTempo && (
+              <p className="text-xs text-muted-foreground italic">
+                Beat quantization disabled when preserving tempo
+              </p>
+            )}
           </div>
           
           <div className="flex items-center justify-between">
@@ -152,7 +191,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
             </Label>
             <Switch
               id="swing-preservation"
-              disabled={disabled || beatQuantization[0] === 0}
+              disabled={disabled || beatQuantization[0] === 0 || preserveTempo}
               checked={swingPreservation}
               onCheckedChange={setSwingPreservation}
             />
