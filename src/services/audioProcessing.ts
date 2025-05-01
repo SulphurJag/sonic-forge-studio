@@ -1,3 +1,4 @@
+
 import { toast } from "@/hooks/use-toast";
 
 // Audio processing configuration types
@@ -346,6 +347,7 @@ class RhythmicProcessor {
   private inputNode: GainNode;
   private outputNode: GainNode;
   private compressor: DynamicsCompressorNode;
+  private enhancer: BiquadFilterNode;
   private beatQuantizationAmount: number = 0;
   private preserveSwing: boolean = true;
   private preserveTempo: boolean = true;
@@ -358,6 +360,13 @@ class RhythmicProcessor {
     this.inputNode = audioContext.createGain();
     this.outputNode = audioContext.createGain();
     this.compressor = audioContext.createDynamicsCompressor();
+    this.enhancer = audioContext.createBiquadFilter();
+    
+    // Configure enhancer for transient enhancement
+    this.enhancer.type = "peaking";
+    this.enhancer.frequency.value = 1200;
+    this.enhancer.Q.value = 1.0;
+    this.enhancer.gain.value = 0;
     
     // Configure compressor for transient shaping
     this.compressor.threshold.value = -24;
@@ -366,26 +375,36 @@ class RhythmicProcessor {
     this.compressor.release.value = 0.1;
     
     // Connect nodes
-    this.inputNode.connect(this.compressor);
+    this.inputNode.connect(this.enhancer);
+    this.enhancer.connect(this.compressor);
     this.compressor.connect(this.outputNode);
   }
   
   // Set beat quantization amount (0-1)
   setBeatQuantization(amount: number, preserveSwing: boolean, preserveTempo: boolean): void {
-    // If preserveTempo is true, we essentially disable beat quantization by setting to 0
-    this.beatQuantizationAmount = preserveTempo ? 0 : Math.max(0, Math.min(1, amount));
+    this.beatQuantizationAmount = Math.max(0, Math.min(1, amount));
     this.preserveSwing = preserveSwing;
     this.preserveTempo = preserveTempo;
     
-    // If preserving tempo, use extremely light settings that only enhance transients
-    // without affecting timing
+    // Adjust the compressor settings based on preserveTempo
     if (this.preserveTempo) {
-      // Very light transient enhancement that doesn't affect timing
-      this.compressor.attack.value = 0.005; // Slower attack to avoid changing transients too much
-      this.compressor.release.value = 0.2;  // Slower release to preserve original sound
-      this.compressor.ratio.value = 2;      // Lower ratio for gentler effect
+      // Sound-preserving mode - use gentler compressor settings
+      // that enhance transients without changing timing
+      this.compressor.threshold.value = -20;
+      this.compressor.ratio.value = 2 + (this.beatQuantizationAmount * 0.5); // 2-2.5 ratio
+      this.compressor.attack.value = 0.01; // Slower attack to preserve transients
+      this.compressor.release.value = 0.2;  // Slower release preserves the original groove better
+      
+      // Use enhancer to bring out transients without changing timing
+      this.enhancer.frequency.value = 1200;
+      this.enhancer.Q.value = 0.8;
+      this.enhancer.gain.value = this.beatQuantizationAmount * 2; // 0-2dB boost
     } else {
+      // Traditional beat quantization with more aggressive settings
       // Apply settings to compressor for transient shaping
+      this.compressor.threshold.value = -24;
+      this.compressor.ratio.value = 4;
+      
       // Lower attack = more punch on transients
       this.compressor.attack.value = 0.001 + (this.beatQuantizationAmount * 0.01);
       
@@ -393,9 +412,17 @@ class RhythmicProcessor {
       if (this.preserveSwing) {
         // Longer release preserves more of the original groove
         this.compressor.release.value = 0.1 + (this.beatQuantizationAmount * 0.2);
+        // Enhance transients to create subtle timing feel
+        this.enhancer.frequency.value = 1800;
+        this.enhancer.Q.value = 1.2;
+        this.enhancer.gain.value = this.beatQuantizationAmount * 3; // 0-3dB boost
       } else {
         // Shorter release tightens timing more aggressively
         this.compressor.release.value = 0.1 + (this.beatQuantizationAmount * 0.05);
+        // Different frequency focus for more rigid timing
+        this.enhancer.frequency.value = 2200; 
+        this.enhancer.Q.value = 1.5;
+        this.enhancer.gain.value = this.beatQuantizationAmount * 4; // 0-4dB boost
       }
     }
   }

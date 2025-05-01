@@ -170,7 +170,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
             </div>
             <Slider
               id="beat-quantization"
-              disabled={disabled || preserveTempo}
+              disabled={disabled}
               min={0}
               max={100}
               step={1}
@@ -178,9 +178,13 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               onValueChange={setBeatQuantization}
               className="py-2"
             />
-            {preserveTempo && (
+            {!preserveTempo ? (
               <p className="text-xs text-muted-foreground italic">
-                Beat quantization disabled when preserving tempo
+                Higher values quantize more strictly but may affect sound quality.
+              </p>
+            ) : (
+              <p className="text-xs text-muted-foreground italic">
+                Tempo preservation is enabled - beat quantization will be applied with sound preservation.
               </p>
             )}
           </div>
@@ -191,11 +195,14 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
             </Label>
             <Switch
               id="swing-preservation"
-              disabled={disabled || beatQuantization[0] === 0 || preserveTempo}
+              disabled={disabled || beatQuantization[0] === 0}
               checked={swingPreservation}
               onCheckedChange={setSwingPreservation}
             />
           </div>
+          <p className="text-xs text-muted-foreground italic">
+            When enabled, preserves the groove and feel while applying quantization.
+          </p>
         </div>
       )}
     </div>
