@@ -84,8 +84,10 @@ const Index = () => {
     setAudioDuration(0);
     
     // Load the audio file into the processor
+    console.log("Loading audio file:", file.name);
     audioProcessor.loadAudio(file)
       .then(() => {
+        console.log("Audio loaded successfully");
         setProcessingStatus('idle');
         toast({
           title: "Audio Loaded",
@@ -97,7 +99,7 @@ const Index = () => {
         setProcessingStatus('error');
         toast({
           title: "Audio Loading Error",
-          description: "Failed to load the audio file",
+          description: error instanceof Error ? error.message : "Failed to load the audio file",
           variant: "destructive"
         });
       });
@@ -120,6 +122,16 @@ const Index = () => {
   const handleStartProcessing = async () => {
     if (!audioFile) return;
     
+    // Check if audio is loaded and ready for processing
+    if (!audioProcessor.isAudioLoaded()) {
+      toast({
+        title: "Audio Not Ready",
+        description: "Please wait for the audio file to finish loading before processing",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     toast({
       title: "Starting Audio Processing",
       description: `${audioFile.name} is being mastered`,
@@ -128,10 +140,7 @@ const Index = () => {
     setProcessingStatus('processing');
     
     try {
-      // Check if audio is loaded
-      if (!audioProcessor || !audioProcessor.isAudioLoaded()) {
-        throw new Error("Audio file is not loaded properly. Please reload the file and try again.");
-      }
+      console.log("Starting audio processing with settings:", processingSettings);
       
       // Add the file to the Redis processing queue for tracking
       await addJob(audioFile, processingSettings);
@@ -148,10 +157,14 @@ const Index = () => {
       }, 200);
       
       // Actual audio processing
+      console.log("Calling audioProcessor.processAudio()");
       const results = await audioProcessor.processAudio(processingSettings);
+      console.log("Processing complete with results:", results);
       
       // Get the processed file
+      console.log("Getting processed audio file");
       const processedFile = await audioProcessor.getProcessedFile(audioFile);
+      console.log("Processed file created:", processedFile.name);
       
       // Complete the progress and update the status
       clearInterval(progressInterval);

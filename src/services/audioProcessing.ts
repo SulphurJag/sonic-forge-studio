@@ -381,16 +381,20 @@ export class AudioMasteringEngine {
   private wetBuffer?: AudioBuffer;
   private originalBuffer?: AudioBuffer;
   private targetLufs: number = -14;
+  private isLoading: boolean = false;
   
   // Check if audio is loaded and ready for processing
   isAudioLoaded(): boolean {
-    return !!this.originalBuffer && !!this.audioContext;
+    return !!this.originalBuffer && !!this.audioContext && !this.isLoading;
   }
   
   // Initialize the audio context
   initialize(): void {
     try {
-      this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      if (!this.audioContext) {
+        this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+        console.log("Audio context initialized successfully");
+      }
     } catch (e) {
       console.error('Web Audio API is not supported in this browser', e);
       toast({
@@ -411,37 +415,57 @@ export class AudioMasteringEngine {
       return false;
     }
     
+    this.isLoading = true;
+    this.originalBuffer = undefined; // Clear any existing buffer
+    
     return new Promise((resolve, reject) => {
       const fileReader = new FileReader();
       
       fileReader.onload = async (event) => {
         try {
           if (event.target?.result && this.audioContext) {
+            console.log("Audio file read, decoding...");
             const arrayBuffer = event.target.result as ArrayBuffer;
             this.originalBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
+            console.log("Audio buffer decoded successfully");
+            this.isLoading = false;
             resolve(true);
           } else {
+            this.isLoading = false;
+            console.error("Failed to read audio file or audio context not available");
             reject(new Error('Failed to read audio file'));
           }
         } catch (error) {
+          this.isLoading = false;
           console.error('Error decoding audio data', error);
           reject(error);
         }
       };
       
       fileReader.onerror = (error) => {
+        this.isLoading = false;
+        console.error("File reader error:", error);
         reject(error);
       };
       
+      console.log("Starting to read audio file");
       fileReader.readAsArrayBuffer(file);
     });
   }
   
   // Process audio with all processors
   async processAudio(settings: ProcessingSettings): Promise<ProcessingResults> {
+    // Double-check that audio is loaded properly
+    if (!this.isAudioLoaded()) {
+      console.error("Audio not properly loaded. Context:", !!this.audioContext, "Buffer:", !!this.originalBuffer, "Loading:", this.isLoading);
+      throw new Error('Audio context or buffer not initialized. Please ensure the audio file is fully loaded before processing.');
+    }
+    
     if (!this.audioContext || !this.originalBuffer) {
       throw new Error('Audio context or buffer not initialized');
     }
+    
+    console.log("Creating offline context for processing");
     
     // Create offline context for processing
     const offlineContext = new OfflineAudioContext(
@@ -453,6 +477,8 @@ export class AudioMasteringEngine {
     // Create source node
     const sourceNode = offlineContext.createBufferSource();
     sourceNode.buffer = this.originalBuffer;
+    
+    console.log("Setting up audio processing chain");
     
     // Setup processors
     const loudnessAnalyzer = new LoudnessAnalyzer(offlineContext);
@@ -498,31 +524,40 @@ export class AudioMasteringEngine {
       
     outputGain.gain.value = finalGain;
     
+    console.log("Starting audio rendering");
+    
     // Start rendering
     sourceNode.start(0);
     
-    // Render audio
-    const renderedBuffer = await offlineContext.startRendering();
-    
-    // Store the processed buffer
-    this.wetBuffer = renderedBuffer;
-    this.dryBuffer = this.originalBuffer;
-    
-    // Set the mix (100 = 100% wet/processed)
-    this.dryWetMix = settings.dryWet;
-    
-    // Estimate output measurements
-    const noiseReduction = noiseProcessor.estimateNoiseReduction();
-    const outputLufs = settings.targetLufs;
-    const outputPeak = Math.min(0, inputPeak + 20 * Math.log10(finalGain));
-    
-    return {
-      inputLufs,
-      outputLufs,
-      inputPeak,
-      outputPeak,
-      noiseReduction
-    };
+    try {
+      // Render audio
+      console.log("Waiting for offline context rendering to complete");
+      const renderedBuffer = await offlineContext.startRendering();
+      console.log("Rendering completed successfully");
+      
+      // Store the processed buffer
+      this.wetBuffer = renderedBuffer;
+      this.dryBuffer = this.originalBuffer;
+      
+      // Set the mix (100 = 100% wet/processed)
+      this.dryWetMix = settings.dryWet;
+      
+      // Estimate output measurements
+      const noiseReduction = noiseProcessor.estimateNoiseReduction();
+      const outputLufs = settings.targetLufs;
+      const outputPeak = Math.min(0, inputPeak + 20 * Math.log10(finalGain));
+      
+      return {
+        inputLufs,
+        outputLufs,
+        inputPeak,
+        outputPeak,
+        noiseReduction
+      };
+    } catch (error) {
+      console.error("Error during audio rendering:", error);
+      throw new Error(`Error rendering audio: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   }
   
   // Create a mixed buffer using dry/wet ratio
@@ -662,7 +697,7 @@ export class AudioMasteringEngine {
   dispose(): void {
     if (this.audioContext) {
       // Check if the audioContext has a close method (only available on AudioContext, not BaseAudioContext)
-      if ('close' in this.audioContext) {
+      if ('close' in this.audioContext && typeof (this.audioContext as any).close === 'function') {
         (this.audioContext as AudioContext).close().catch(console.error);
       }
       this.audioContext = undefined;
@@ -677,6 +712,7 @@ export class AudioMasteringEngine {
     this.dryBuffer = undefined;
     this.wetBuffer = undefined;
     this.originalBuffer = undefined;
+    this.isLoading = false;
   }
 }
 
