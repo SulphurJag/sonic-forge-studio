@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Progress } from "@/components/ui/progress";
-import { Loader2, CheckCircle, AlertCircle, AlertTriangle } from "lucide-react";
+import { Loader2, CheckCircle, AlertCircle, AlertTriangle, Wand2 } from "lucide-react";
 
 type ProcessingStatus = 'idle' | 'loading' | 'processing' | 'completed' | 'error';
 
@@ -94,11 +94,16 @@ const ProcessingStatus: React.FC<ProcessingStatusProps> = ({
               </div>
             </div>
             
-            <div className="pt-2 text-center text-sm">
+            <div className="flex items-center justify-center space-x-1 pt-2 text-center text-sm">
+              <Wand2 className="h-4 w-4 text-moroder-accent" />
               <span className="text-moroder-accent">
                 Noise Reduction: {results.noiseReduction.toFixed(1)} dB
               </span>
             </div>
+            
+            <p className="text-xs text-center text-muted-foreground italic mt-2">
+              All original sonic characteristics have been preserved while enhancing audio quality
+            </p>
           </div>
         );
       

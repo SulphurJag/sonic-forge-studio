@@ -15,7 +15,7 @@ import {
   ToggleGroup,
   ToggleGroupItem
 } from "@/components/ui/toggle-group";
-import { Info } from "lucide-react";
+import { Info, WaveformCircle, ZapCircle } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface SettingsPanelProps {
@@ -29,6 +29,10 @@ interface SettingsPanelProps {
     swingPreservation: boolean;
     preserveTempo: boolean;
     preserveTone: boolean;
+    beatCorrectionMode?: string;
+    beatAnalysisIntensity?: number;
+    transientPreservation?: boolean;
+    phaseAlignment?: boolean;
   }) => void;
 }
 
@@ -65,10 +69,28 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
         beatQuantization: beatQuantization[0],
         swingPreservation,
         preserveTempo,
-        preserveTone
+        preserveTone,
+        beatCorrectionMode,
+        beatAnalysisIntensity: beatAnalysisIntensity[0],
+        transientPreservation,
+        phaseAlignment
       });
     }
-  }, [mode, targetLufs, dryWet, beatQuantization, swingPreservation, noiseReduction, preserveTempo, preserveTone, onSettingsChange]);
+  }, [
+    mode, 
+    targetLufs, 
+    dryWet, 
+    beatQuantization, 
+    swingPreservation, 
+    noiseReduction, 
+    preserveTempo, 
+    preserveTone, 
+    beatCorrectionMode, 
+    beatAnalysisIntensity,
+    transientPreservation,
+    phaseAlignment,
+    onSettingsChange
+  ]);
 
   return (
     <div className={`space-y-6 ${disabled ? 'opacity-70' : ''}`}>
@@ -96,7 +118,20 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
       <div className="space-y-4">
         <div className="space-y-2">
           <div className="flex justify-between">
-            <Label htmlFor="target-lufs">Target Loudness (LUFS)</Label>
+            <div className="flex items-center space-x-2">
+              <Label htmlFor="target-lufs">Target Loudness (LUFS)</Label>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-4 w-4 text-moroder-primary/60" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-[300px]">
+                    Sets the integrated loudness target for mastering. Industry standards: Music streaming: -14 LUFS, 
+                    Podcasts: -16 LUFS, Cinema: -23 LUFS.
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
             <span className="text-sm text-muted-foreground">{targetLufs[0]} LUFS</span>
           </div>
           <Slider
@@ -130,7 +165,20 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
         
         <div className="space-y-2">
           <div className="flex justify-between">
-            <Label htmlFor="noise-reduction">Noise Reduction</Label>
+            <div className="flex items-center space-x-2">
+              <Label htmlFor="noise-reduction">Noise Reduction</Label>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-4 w-4 text-moroder-primary/60" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-[300px]">
+                    Advanced spectral noise reduction that preserves musical details. Higher values provide stronger reduction
+                    but may affect audio quality if set too high.
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
             <span className="text-sm text-muted-foreground">{noiseReduction[0]}%</span>
           </div>
           <Slider
@@ -157,11 +205,11 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Info className="h-4 w-4 text-moroder-primary/60" />
+                  <ZapCircle className="h-4 w-4 text-moroder-primary/60" />
                 </TooltipTrigger>
                 <TooltipContent className="max-w-[300px]">
-                  Ensures the processed audio maintains its original tempo, time signature, 
-                  and rhythmic feel. Essential for preserving the musical integrity.
+                  <strong>Critical Setting:</strong> Guarantees the processed audio maintains its original tempo, time signature, 
+                  and rhythmic feel while still allowing beat alignment. Strongly recommended to keep enabled.
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
@@ -182,11 +230,11 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Info className="h-4 w-4 text-moroder-primary/60" />
+                  <WaveformCircle className="h-4 w-4 text-moroder-primary/60" />
                 </TooltipTrigger>
                 <TooltipContent className="max-w-[300px]">
-                  Maintains the original tonal qualities and sonic character of the audio 
-                  while still applying enhancement. Uses gentler processing techniques.
+                  <strong>Critical Setting:</strong> Maintains the original tonal qualities, harmonics, and sonic character of the audio 
+                  while still applying enhancement. Uses advanced spectral processing to ensure pristine sound quality.
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
@@ -207,7 +255,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           <div className="space-y-2">
             <div className="flex justify-between items-center">
               <div className="flex items-center space-x-2">
-                <Label htmlFor="beat-quantization">Beat Correction Strength</Label>
+                <Label htmlFor="beat-quantization">Beat Alignment Strength</Label>
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -215,12 +263,13 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     </TooltipTrigger>
                     <TooltipContent className="max-w-[300px]">
                       Intelligently aligns off-beat elements to the grid while preserving the 
-                      original audio character. Higher values apply stronger correction.
+                      original audio character. Higher values apply stronger correction without changing
+                      the song's fundamental structure or feel.
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
               </div>
-              <span className="text-sm text-muted-foreground">{beatQuantization[0]/100}</span>
+              <span className="text-sm text-muted-foreground">{(beatQuantization[0]/100).toFixed(2)}</span>
             </div>
             <Slider
               id="beat-quantization"
@@ -235,7 +284,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
             
             {beatQuantization[0] > 0 && (
               <div className="mt-2 space-y-2">
-                <Label className="text-sm">Beat Correction Mode</Label>
+                <Label className="text-sm">Beat Alignment Mode</Label>
                 <ToggleGroup 
                   type="single" 
                   variant="outline"
@@ -260,26 +309,26 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 </ToggleGroup>
                 <p className="text-xs text-muted-foreground italic">
                   {beatCorrectionMode === "gentle" && 
-                    "Subtle correction that prioritizes preserving the original sound."}
+                    "Subtle alignment that prioritizes preserving the original sound and feel of the music."}
                   {beatCorrectionMode === "balanced" && 
-                    "Moderate correction with good sound preservation."}
+                    "Moderate alignment with excellent sound preservation and noticeable timing improvements."}
                   {beatCorrectionMode === "precise" && 
-                    "Strong correction that prioritizes rhythmic accuracy."}
+                    "Strong alignment that delivers professional-grade timing accuracy while maintaining character."}
                   {beatCorrectionMode === "surgical" && 
-                    "Maximum precision correction for professional results."}
+                    "Maximum precision alignment using advanced AI spectral analysis for perfect timing."}
                 </p>
               </div>
             )}
             
             {preserveTempo ? (
               <p className="text-xs text-muted-foreground italic">
-                With Tempo Preservation enabled, beat correction will align elements while 
-                maintaining the original feel and timing of the music.
+                With Tempo Preservation enabled, beat alignment will correct timing issues while 
+                maintaining the original feel, groove, and timing structure of the music.
               </p>
             ) : (
-              <p className="text-xs text-muted-foreground italic mt-1">
-                <span className="text-amber-400">Note:</span> Disabling Tempo Preservation 
-                may alter the original timing of the music.
+              <p className="text-xs text-amber-400/90 italic mt-1 font-medium">
+                Warning: Disabling Tempo Preservation with beat alignment may significantly alter 
+                the original timing and feel of the music.
               </p>
             )}
           </div>
@@ -295,8 +344,8 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     <Info className="h-4 w-4 text-moroder-primary/60" />
                   </TooltipTrigger>
                   <TooltipContent className="max-w-[300px]">
-                    Maintains the natural groove and swing feel of the music when applying beat 
-                    correction. Ensures beats aren't over-quantized to a rigid grid.
+                    <strong>Critical Setting:</strong> Maintains the natural groove, feel and swing of the music when applying beat 
+                    alignment. Ensures beats aren't over-quantized to a rigid grid, preserving the human feel.
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
@@ -309,12 +358,23 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
             />
           </div>
           
-          {beatQuantization[0] > 50 && (
+          {beatQuantization[0] > 25 && (
             <div className="flex items-center justify-between mt-2">
               <div className="flex items-center space-x-2">
                 <Label htmlFor="advanced-options" className="cursor-pointer">
                   Advanced Rhythm Controls
                 </Label>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="h-4 w-4 text-moroder-primary/60" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-[300px]">
+                      Unlock professional-grade controls for fine-tuning beat alignment behavior. These settings help ensure
+                      perfect timing while maintaining the sonic integrity of the original recording.
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </div>
               <Switch
                 id="advanced-options"
@@ -329,7 +389,20 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
             <div className="space-y-4 px-3 py-3 border border-moroder-primary/10 rounded-md bg-moroder-dark/20">
               <div className="space-y-2">
                 <div className="flex justify-between">
-                  <Label htmlFor="beat-analysis">Beat Analysis Intensity</Label>
+                  <div className="flex items-center space-x-2">
+                    <Label htmlFor="beat-analysis">Beat Analysis Precision</Label>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="h-4 w-4 text-moroder-primary/60" />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-[300px]">
+                          Controls how thoroughly the algorithm analyzes the audio to detect beats. Higher values provide more accurate 
+                          beat detection while still maintaining the original sonic character.
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
                   <span className="text-sm text-muted-foreground">{beatAnalysisIntensity[0]}%</span>
                 </div>
                 <Slider
@@ -343,8 +416,8 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   className="py-2"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Higher values provide more accurate beat detection at the cost of potentially 
-                  over-correcting subtle timing nuances.
+                  Higher values provide more detailed temporal analysis without over-correcting 
+                  intentional timing variations.
                 </p>
               </div>
               
@@ -359,8 +432,9 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                         <Info className="h-4 w-4 text-moroder-primary/60" />
                       </TooltipTrigger>
                       <TooltipContent className="max-w-[300px]">
-                        Maintains the attack characteristics of percussive elements even when
-                        their timing is adjusted.
+                        Maintains the attack characteristics and dynamic impact of percussive elements even when
+                        their timing is adjusted. Essential for preserving the punch and clarity of drums, percussion, and other
+                        transient-rich sounds.
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
@@ -376,7 +450,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
                   <Label htmlFor="phase-alignment" className="cursor-pointer">
-                    Phase Alignment
+                    Phase Coherence
                   </Label>
                   <TooltipProvider>
                     <Tooltip>
@@ -384,8 +458,9 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                         <Info className="h-4 w-4 text-moroder-primary/60" />
                       </TooltipTrigger>
                       <TooltipContent className="max-w-[300px]">
-                        Ensures phase coherence is maintained when shifting beats, preventing 
-                        artifacts and maintaining clarity.
+                        Ensures phase coherence is maintained when aligning beats, preventing 
+                        artifacts and maintaining clarity. Critical for preserving spatial image and preventing
+                        frequency cancellation during timing adjustments.
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
@@ -401,8 +476,14 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           )}
           
           <p className="text-xs text-muted-foreground italic">
-            Preserves the natural groove and feel of the music while correcting timing issues.
-            {beatCorrectionMode === "surgical" && " Surgical mode applies advanced spectral analysis for precise timing correction."}
+            {beatQuantization[0] > 0 ? (
+              <>
+                Beat alignment intelligently corrects timing while preserving the musical essence.
+                {beatCorrectionMode === "surgical" && " Surgical mode applies advanced spectral analysis for perfect timing correction without artifacts."}
+              </>
+            ) : (
+              "Beat alignment is currently disabled. Increase the value to enable intelligent beat correction."  
+            )}
           </p>
         </div>
       )}
