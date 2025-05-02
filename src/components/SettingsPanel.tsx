@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
@@ -15,7 +14,7 @@ import {
   ToggleGroup,
   ToggleGroupItem
 } from "@/components/ui/toggle-group";
-import { Info, WaveformCircle, ZapCircle } from "lucide-react";
+import { Info, Circle, Zap } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface SettingsPanelProps {
@@ -205,7 +204,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <ZapCircle className="h-4 w-4 text-moroder-primary/60" />
+                  <Zap className="h-4 w-4 text-moroder-primary/60" />
                 </TooltipTrigger>
                 <TooltipContent className="max-w-[300px]">
                   <strong>Critical Setting:</strong> Guarantees the processed audio maintains its original tempo, time signature, 
@@ -230,7 +229,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <WaveformCircle className="h-4 w-4 text-moroder-primary/60" />
+                  <Circle className="h-4 w-4 text-moroder-primary/60" />
                 </TooltipTrigger>
                 <TooltipContent className="max-w-[300px]">
                   <strong>Critical Setting:</strong> Maintains the original tonal qualities, harmonics, and sonic character of the audio 
