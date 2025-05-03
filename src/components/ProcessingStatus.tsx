@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Progress } from "@/components/ui/progress";
-import { Loader2, CheckCircle, AlertCircle, AlertTriangle, Wand2 } from "lucide-react";
+import { Loader2, CheckCircle, AlertCircle, AlertTriangle, Wand2, Lightbulb, Music } from "lucide-react";
 
 type ProcessingStatus = 'idle' | 'loading' | 'processing' | 'completed' | 'error';
 
@@ -15,6 +15,8 @@ interface ProcessingStatusProps {
     inputPeak: number;
     outputPeak: number;
     noiseReduction: number;
+    contentType?: string[];
+    artifactsEliminated?: boolean;
   };
 }
 
@@ -100,6 +102,24 @@ const ProcessingStatus: React.FC<ProcessingStatusProps> = ({
                 Noise Reduction: {results.noiseReduction.toFixed(1)} dB
               </span>
             </div>
+            
+            {results.contentType && results.contentType.length > 0 && (
+              <div className="flex items-center justify-center space-x-1 pt-1 text-center text-sm">
+                <Music className="h-4 w-4 text-purple-400" />
+                <span className="text-purple-400">
+                  Content Type: {results.contentType.join(', ')}
+                </span>
+              </div>
+            )}
+            
+            {results.artifactsEliminated && (
+              <div className="flex items-center justify-center space-x-1 pt-1 text-center text-sm">
+                <Lightbulb className="h-4 w-4 text-amber-400" />
+                <span className="text-amber-400">
+                  Audio artifacts detected and fixed
+                </span>
+              </div>
+            )}
             
             <p className="text-xs text-center text-muted-foreground italic mt-2">
               All original sonic characteristics have been preserved while enhancing audio quality

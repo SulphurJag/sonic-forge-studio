@@ -12,6 +12,9 @@ interface SwitchWithLabelProps {
   disabled?: boolean;
   tooltip?: React.ReactNode;
   icon?: React.ReactNode;
+  iconColor?: string;
+  className?: string;
+  beta?: boolean;
 }
 
 const SwitchWithLabel: React.FC<SwitchWithLabelProps> = ({
@@ -21,15 +24,30 @@ const SwitchWithLabel: React.FC<SwitchWithLabelProps> = ({
   onCheckedChange,
   disabled = false,
   tooltip,
-  icon
+  icon,
+  iconColor = "text-moroder-primary/60",
+  className = "",
+  beta = false
 }) => {
   return (
-    <div className="flex items-center justify-between">
+    <div className={`flex items-center justify-between ${className}`}>
       <div className="flex items-center space-x-2">
-        <Label htmlFor={id} className="cursor-pointer">
+        <Label htmlFor={id} className="cursor-pointer flex items-center gap-2">
           {label}
+          {beta && (
+            <span className="inline-flex items-center rounded-md bg-moroder-primary/20 px-2 py-0.5 text-xs font-medium">
+              Beta
+            </span>
+          )}
         </Label>
-        {tooltip && <SettingsTooltip icon={icon}>{tooltip}</SettingsTooltip>}
+        {tooltip && icon && (
+          <SettingsTooltip icon={React.cloneElement(icon as React.ReactElement, { className: `h-4 w-4 ${iconColor}` })}>
+            {tooltip}
+          </SettingsTooltip>
+        )}
+        {tooltip && !icon && (
+          <SettingsTooltip>{tooltip}</SettingsTooltip>
+        )}
       </div>
       <Switch
         id={id}

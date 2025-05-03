@@ -5,6 +5,7 @@ import ModeSelector from './settings/ModeSelector';
 import AudioQualitySettings from './settings/AudioQualitySettings';
 import PreservationSettings from './settings/PreservationSettings';
 import BeatAlignmentSettings from './settings/BeatAlignmentSettings';
+import AIProcessingSettings from './settings/AIProcessingSettings';
 
 interface SettingsPanelProps {
   disabled?: boolean;
@@ -21,6 +22,13 @@ interface SettingsPanelProps {
     beatAnalysisIntensity?: number;
     transientPreservation?: boolean;
     phaseAlignment?: boolean;
+    enableAI?: boolean;
+    aiNoiseReduction?: boolean;
+    noiseReductionStrategy?: 'auto' | 'dtln' | 'spectral' | 'nsnet' | 'hybrid';
+    noiseReductionIntensity?: number;
+    contentClassification?: boolean;
+    autoProcessing?: boolean;
+    artifactElimination?: boolean;
   }) => void;
 }
 
@@ -46,6 +54,15 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const [phaseAlignment, setPhaseAlignment] = useState(true);
   const [beatAnalysisIntensity, setBeatAnalysisIntensity] = useState([75]);
 
+  // AI Processing options
+  const [enableAI, setEnableAI] = useState(false);
+  const [aiNoiseReduction, setAiNoiseReduction] = useState(false);
+  const [noiseReductionStrategy, setNoiseReductionStrategy] = useState<'auto' | 'dtln' | 'spectral' | 'nsnet' | 'hybrid'>('auto');
+  const [noiseReductionIntensity, setNoiseReductionIntensity] = useState([50]);
+  const [contentClassification, setContentClassification] = useState(false);
+  const [autoProcessing, setAutoProcessing] = useState(false);
+  const [artifactElimination, setArtifactElimination] = useState(false);
+
   // Update parent component when settings change
   useEffect(() => {
     if (onSettingsChange) {
@@ -61,7 +78,15 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
         beatCorrectionMode,
         beatAnalysisIntensity: beatAnalysisIntensity[0],
         transientPreservation,
-        phaseAlignment
+        phaseAlignment,
+        // AI settings
+        enableAI,
+        aiNoiseReduction,
+        noiseReductionStrategy,
+        noiseReductionIntensity: noiseReductionIntensity[0],
+        contentClassification,
+        autoProcessing,
+        artifactElimination
       });
     }
   }, [
@@ -77,6 +102,14 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     beatAnalysisIntensity,
     transientPreservation,
     phaseAlignment,
+    // AI settings
+    enableAI,
+    aiNoiseReduction,
+    noiseReductionStrategy,
+    noiseReductionIntensity,
+    contentClassification,
+    autoProcessing,
+    artifactElimination,
     onSettingsChange
   ]);
 
@@ -132,6 +165,26 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           disabled={disabled}
         />
       )}
+      
+      <Separator className="bg-moroder-primary/20" />
+      
+      <AIProcessingSettings
+        enableAI={enableAI}
+        setEnableAI={setEnableAI}
+        aiNoiseReduction={aiNoiseReduction}
+        setAiNoiseReduction={setAiNoiseReduction}
+        noiseReductionStrategy={noiseReductionStrategy}
+        setNoiseReductionStrategy={setNoiseReductionStrategy}
+        noiseReductionIntensity={noiseReductionIntensity}
+        setNoiseReductionIntensity={setNoiseReductionIntensity}
+        contentClassification={contentClassification}
+        setContentClassification={setContentClassification}
+        autoProcessing={autoProcessing}
+        setAutoProcessing={setAutoProcessing}
+        artifactElimination={artifactElimination}
+        setArtifactElimination={setArtifactElimination}
+        disabled={disabled}
+      />
     </div>
   );
 };

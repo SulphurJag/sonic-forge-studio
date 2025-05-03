@@ -6,11 +6,13 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 interface SettingsTooltipProps {
   children: React.ReactNode;
   icon?: React.ReactNode;
+  sideOffset?: number;
 }
 
 const SettingsTooltip: React.FC<SettingsTooltipProps> = ({ 
   children, 
-  icon = <Info className="h-4 w-4 text-moroder-primary/60" /> 
+  icon = <Info className="h-4 w-4 text-moroder-primary/60" />,
+  sideOffset = 4
 }) => {
   return (
     <TooltipProvider>
@@ -18,7 +20,7 @@ const SettingsTooltip: React.FC<SettingsTooltipProps> = ({
         <TooltipTrigger asChild>
           {icon}
         </TooltipTrigger>
-        <TooltipContent className="max-w-[300px]">
+        <TooltipContent sideOffset={sideOffset} className="max-w-[300px]">
           {children}
         </TooltipContent>
       </Tooltip>
