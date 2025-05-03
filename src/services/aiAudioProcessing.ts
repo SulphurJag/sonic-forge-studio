@@ -1,4 +1,3 @@
-
 import * as ort from 'onnxruntime-web';
 import * as tf from '@tensorflow/tfjs';
 import { pipeline } from '@huggingface/transformers';
@@ -159,7 +158,7 @@ class ModelManager {
   }
   
   // Load a Hugging Face Transformers model
-  async loadTransformersModel(task: string, modelId: string, modelKey: string): Promise<any> {
+  async loadTransformersModel(task: any, modelId: string, modelKey: string): Promise<any> {
     if (this.modelCache.has(modelKey)) {
       return this.modelCache.get(modelKey);
     }
@@ -629,7 +628,7 @@ export class AIAudioMasteringEngine {
         toast({
           title: "Partial Initialization",
           description: "Some AI models could not be loaded. Limited functionality available.",
-          variant: "warning"
+          variant: "destructive"
         });
       }
       

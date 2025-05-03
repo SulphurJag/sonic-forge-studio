@@ -2,6 +2,7 @@
 import React from 'react';
 import { Cpu, Zap, Wand2, AlertCircle } from "lucide-react";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import SwitchWithLabel from './SwitchWithLabel';
 import {
   Select,

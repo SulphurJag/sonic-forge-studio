@@ -5,7 +5,7 @@ import { Slider } from "@/components/ui/slider";
 import SettingsTooltip from './SettingsTooltip';
 
 interface SliderWithLabelProps {
-  id: string;
+  id?: string;
   label: string;
   value: number[];
   onValueChange: (value: number[]) => void;
@@ -16,6 +16,7 @@ interface SliderWithLabelProps {
   tooltip?: React.ReactNode;
   unit?: string;
   icon?: React.ReactNode;
+  valueLabel?: string;
 }
 
 const SliderWithLabel: React.FC<SliderWithLabelProps> = ({
@@ -29,7 +30,8 @@ const SliderWithLabel: React.FC<SliderWithLabelProps> = ({
   disabled = false,
   tooltip,
   unit = '',
-  icon
+  icon,
+  valueLabel
 }) => {
   return (
     <div className="space-y-2">
@@ -39,7 +41,7 @@ const SliderWithLabel: React.FC<SliderWithLabelProps> = ({
           {tooltip && <SettingsTooltip icon={icon}>{tooltip}</SettingsTooltip>}
         </div>
         <span className="text-sm text-muted-foreground">
-          {value[0]}{unit}
+          {valueLabel || `${value[0]}${unit}`}
         </span>
       </div>
       <Slider
