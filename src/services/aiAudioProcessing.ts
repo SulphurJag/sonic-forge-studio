@@ -1,3 +1,4 @@
+
 import * as ort from 'onnxruntime-web';
 import * as tf from '@tensorflow/tfjs';
 import { pipeline, env } from '@huggingface/transformers';
@@ -177,7 +178,7 @@ class ModelManager {
     task: "feature-extraction" | "text-classification" | "token-classification" | 
           "question-answering" | "summarization" | "translation" | 
           "text-generation" | "fill-mask" | 
-          "text-to-image" | "image-classification" | "image-segmentation" | 
+          "image-classification" | "image-segmentation" | 
           "object-detection" | "image-to-text" | "automatic-speech-recognition" | 
           "audio-classification" | "text-to-speech" | "zero-shot-classification",
     modelId: string,
