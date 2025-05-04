@@ -175,7 +175,7 @@ class ModelManager {
       // Load the pipeline with webgpu device if available, fallback to cpu
       const model = await pipeline(task, modelId, { 
         device: 'webgpu', 
-        progress_callback: (progress) => {
+        progress_callback: (progress: number) => {
           console.log(`Loading model ${modelKey}: ${Math.round(progress * 100)}%`);
         }
       });
