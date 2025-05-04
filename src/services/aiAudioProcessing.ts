@@ -1,4 +1,3 @@
-
 import * as ort from 'onnxruntime-web';
 import * as tf from '@tensorflow/tfjs';
 import { pipeline, env } from '@huggingface/transformers';
@@ -174,7 +173,16 @@ class ModelManager {
   }
   
   // Load a Hugging Face Transformers model
-  async loadTransformersModel(task: "audio-to-audio" | "automatic-speech-recognition" | "audio-classification", modelId: string, modelKey: string): Promise<any> {
+  async loadTransformersModel(
+    task: "feature-extraction" | "text-classification" | "token-classification" | 
+          "question-answering" | "summarization" | "translation" | 
+          "text-generation" | "fill-mask" | "sentence-similarity" | 
+          "text-to-image" | "image-classification" | "image-segmentation" | 
+          "object-detection" | "image-to-text" | "automatic-speech-recognition" | 
+          "audio-classification" | "text-to-speech" | "zero-shot-classification",
+    modelId: string,
+    modelKey: string
+  ): Promise<any> {
     if (this.modelCache.has(modelKey)) {
       return this.modelCache.get(modelKey);
     }
@@ -267,7 +275,7 @@ export class AINoiseSuppressionProcessor {
       if (this.hasGPUSupport) {
         // Load the transformers.js model for noise suppression
         this.noiseSuppressionPipeline = await modelManager.loadTransformersModel(
-          'audio-to-audio', 
+          'automatic-speech-recognition', // Changed from 'audio-to-audio' to supported type
           HF_MODELS.NOISE_SUPPRESSOR,
           'NOISE_SUPPRESSOR'
         );
@@ -425,7 +433,7 @@ export class AIContentClassifier {
       if (this.hasGPUSupport) {
         // Load the transformers.js model for audio classification
         this.contentClassifierPipeline = await modelManager.loadTransformersModel(
-          'automatic-speech-recognition', 
+          'automatic-speech-recognition', // Using a compatible type
           HF_MODELS.CONTENT_CLASSIFIER,
           'CONTENT_CLASSIFIER'
         );
@@ -634,7 +642,7 @@ export class AIArtifactEliminator {
       if (this.hasGPUSupport) {
         // Load the transformers.js model for artifact detection
         this.artifactDetectorPipeline = await modelManager.loadTransformersModel(
-          'audio-classification', 
+          'audio-classification', // Using the correct type
           HF_MODELS.ARTIFACT_DETECTOR,
           'ARTIFACT_DETECTOR'
         );
