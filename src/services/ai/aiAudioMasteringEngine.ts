@@ -1,6 +1,6 @@
 
 import { AINoiseSuppressionProcessor } from './noiseSuppressionProcessor';
-import { AIContentClassifier } from './contentClassifier';
+import { AIContentClassifier } from './content/contentClassifier';
 import { AIArtifactEliminator } from './artifactEliminator';
 import { modelManager } from './modelManager';
 import { toast } from "@/hooks/use-toast";

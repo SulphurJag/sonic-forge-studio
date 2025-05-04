@@ -7,6 +7,6 @@ export const aiAudioProcessor = new AIAudioMasteringEngine();
 // Export all classes for individual use if needed
 export * from './modelManager';
 export * from './noiseSuppressionProcessor';
-export * from './contentClassifier';
+export * from './content';
 export * from './artifactEliminator';
 export * from './aiAudioMasteringEngine';
