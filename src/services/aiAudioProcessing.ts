@@ -1,4 +1,3 @@
-
 import * as ort from 'onnxruntime-web';
 import * as tf from '@tensorflow/tfjs';
 import { pipeline } from '@huggingface/transformers';
@@ -175,7 +174,13 @@ class ModelManager {
       // Load the pipeline with webgpu device if available, fallback to cpu
       const model = await pipeline(task, modelId, { 
         device: 'webgpu', 
-        progress_callback: (progress: number) => {
+        progress_callback: (progressInfo: any) => {
+          // Extract a numeric value from the progress info object
+          // or use a default value if the structure doesn't match expectations
+          const progress = typeof progressInfo === 'number' ? 
+            progressInfo : 
+            (progressInfo && progressInfo.progress ? progressInfo.progress : 0);
+            
           console.log(`Loading model ${modelKey}: ${Math.round(progress * 100)}%`);
         }
       });
