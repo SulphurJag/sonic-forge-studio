@@ -12,7 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import SliderWithLabel from './SliderWithLabel';
-import { aiAudioProcessor } from '@/services/aiAudioProcessing';
+import { aiAudioProcessor } from '@/services/ai';
 import { toast } from "@/hooks/use-toast";
 
 interface AIProcessingSettingsProps {
