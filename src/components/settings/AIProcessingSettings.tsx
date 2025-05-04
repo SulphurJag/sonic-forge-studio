@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Cpu, Zap, Wand2, AlertCircle, Loader2 } from "lucide-react";
+import { Cpu, Zap, Wand2, AlertCircle, Loader2, MonitorSmartphone } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import SwitchWithLabel from './SwitchWithLabel';
@@ -54,7 +54,8 @@ const AIProcessingSettings: React.FC<AIProcessingSettingsProps> = ({
     noiseProcessor: false,
     contentClassifier: false,
     artifactEliminator: false,
-    overall: false
+    overall: false,
+    hasWebGPU: false
   });
   
   const [isInitializing, setIsInitializing] = React.useState(false);
@@ -77,13 +78,16 @@ const AIProcessingSettings: React.FC<AIProcessingSettingsProps> = ({
       
       try {
         const initialized = await aiAudioProcessor.initialize();
-        setInitStatus(aiAudioProcessor.getInitializationStatus());
+        const newStatus = aiAudioProcessor.getInitializationStatus();
+        setInitStatus(newStatus);
         setEnableAI(initialized);
         
         if (initialized) {
           toast({
             title: "AI Models Ready",
-            description: "AI audio processing features are now available",
+            description: newStatus.hasWebGPU 
+              ? "AI audio processing features are now available" 
+              : "Using simplified AI processing (WebGPU not supported)",
             variant: "default"
           });
         } else {
@@ -203,7 +207,7 @@ const AIProcessingSettings: React.FC<AIProcessingSettingsProps> = ({
                 iconColor="text-purple-500/70"
                 tooltip={
                   <>
-                    <strong>YAMNet Classification:</strong> Identifies the audio content type to enable 
+                    <strong>Content Classifier:</strong> Identifies the audio content type to enable 
                     genre-specific optimizations and processing.
                   </>
                 }
@@ -234,7 +238,7 @@ const AIProcessingSettings: React.FC<AIProcessingSettingsProps> = ({
                 tooltip={
                   <>
                     <strong>Advanced Reconstruction:</strong> Detects and fixes audio artifacts like 
-                    clicks, pops, clipping and digital distortion using GANs.
+                    clicks, pops, clipping and digital distortion.
                   </>
                 }
                 beta={true}
@@ -248,7 +252,18 @@ const AIProcessingSettings: React.FC<AIProcessingSettingsProps> = ({
                 <AlertCircle className="h-4 w-4 mt-0.5" />
                 <span>
                   Using simulated AI processing since models are not fully loaded.
-                  Real AI processing will work on devices with WebGPU support.
+                </span>
+              </div>
+            </div>
+          )}
+          
+          {!initStatus.hasWebGPU && enableAI && !isInitializing && initStatus.overall && (
+            <div className="rounded-md bg-blue-500/10 p-3 text-xs text-blue-600">
+              <div className="flex items-start gap-2">
+                <MonitorSmartphone className="h-4 w-4 mt-0.5" />
+                <span>
+                  Using simplified AI processing because WebGPU is not supported in your browser.
+                  For full AI capabilities, try Chrome 113+ or Edge 113+.
                 </span>
               </div>
             </div>
