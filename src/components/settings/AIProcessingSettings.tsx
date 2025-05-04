@@ -1,6 +1,6 @@
 
-import React from 'react';
-import { Cpu, Zap, Wand2, AlertCircle } from "lucide-react";
+import React, { useState, useEffect } from 'react';
+import { Cpu, Zap, Wand2, AlertCircle, Loader2 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import SwitchWithLabel from './SwitchWithLabel';
@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/select";
 import SliderWithLabel from './SliderWithLabel';
 import { aiAudioProcessor } from '@/services/aiAudioProcessing';
+import { toast } from "@/hooks/use-toast";
 
 interface AIProcessingSettingsProps {
   enableAI: boolean;
@@ -55,6 +56,8 @@ const AIProcessingSettings: React.FC<AIProcessingSettingsProps> = ({
     artifactEliminator: false,
     overall: false
   });
+  
+  const [isInitializing, setIsInitializing] = React.useState(false);
 
   // Check initialization status when the component mounts
   React.useEffect(() => {
@@ -65,9 +68,42 @@ const AIProcessingSettings: React.FC<AIProcessingSettingsProps> = ({
   // Initialize AI processor if needed
   const handleEnableAI = async (value: boolean) => {
     if (value && !initStatus.overall) {
-      const initialized = await aiAudioProcessor.initialize();
-      setInitStatus(aiAudioProcessor.getInitializationStatus());
-      setEnableAI(initialized);
+      setIsInitializing(true);
+      toast({
+        title: "Initializing AI Models",
+        description: "Please wait while AI models are being loaded...",
+        variant: "default"
+      });
+      
+      try {
+        const initialized = await aiAudioProcessor.initialize();
+        setInitStatus(aiAudioProcessor.getInitializationStatus());
+        setEnableAI(initialized);
+        
+        if (initialized) {
+          toast({
+            title: "AI Models Ready",
+            description: "AI audio processing features are now available",
+            variant: "default"
+          });
+        } else {
+          toast({
+            title: "Initialization Problem",
+            description: "Some AI models couldn't be loaded. Limited functionality available.",
+            variant: "destructive"
+          });
+        }
+      } catch (error) {
+        console.error("Error initializing AI models:", error);
+        toast({
+          title: "Initialization Failed",
+          description: "Could not initialize AI models. Please try again.",
+          variant: "destructive"
+        });
+        setEnableAI(false);
+      } finally {
+        setIsInitializing(false);
+      }
     } else {
       setEnableAI(value);
     }
@@ -89,7 +125,7 @@ const AIProcessingSettings: React.FC<AIProcessingSettingsProps> = ({
         </div>
         <Switch
           id="enable-ai"
-          disabled={disabled}
+          disabled={disabled || isInitializing}
           checked={enableAI}
           onCheckedChange={handleEnableAI}
         />
@@ -97,113 +133,122 @@ const AIProcessingSettings: React.FC<AIProcessingSettingsProps> = ({
       
       {enableAI && (
         <div className="space-y-4 pl-1 border-l-2 border-moroder-primary/20 ml-2">
-          <SwitchWithLabel
-            id="ai-noise-reduction"
-            label="AI Noise Suppression"
-            checked={aiNoiseReduction}
-            onCheckedChange={setAiNoiseReduction}
-            disabled={disabled || !initStatus.noiseProcessor}
-            icon={<Zap />}
-            iconColor="text-green-500/70"
-            tooltip={
-              <>
-                <strong>Advanced Noise Suppression:</strong> Uses neural networks to intelligently 
-                remove background noise while preserving audio fidelity.
-              </>
-            }
-            beta={true}
-          />
-          
-          {aiNoiseReduction && (
-            <div className="space-y-4 ml-4">
-              <div className="space-y-2">
-                <Label htmlFor="noise-strategy" className="text-xs">Suppression Strategy</Label>
-                <Select 
-                  disabled={disabled} 
-                  value={noiseReductionStrategy} 
-                  onValueChange={(v) => setNoiseReductionStrategy(v as any)}
-                >
-                  <SelectTrigger id="noise-strategy" className="bg-moroder-dark border border-moroder-primary/20 h-8 text-sm">
-                    <SelectValue placeholder="Select strategy" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="auto">Auto-detect</SelectItem>
-                    <SelectItem value="dtln">DTLN (Deep filtering)</SelectItem>
-                    <SelectItem value="spectral">Spectral Gating</SelectItem>
-                    <SelectItem value="nsnet">NSNet RNN</SelectItem>
-                    <SelectItem value="hybrid">Hybrid Blend</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <SliderWithLabel
-                label="Suppression Intensity"
-                value={noiseReductionIntensity}
-                onValueChange={setNoiseReductionIntensity}
-                min={0}
-                max={100}
-                step={1}
-                disabled={disabled}
-                tooltip="Controls how aggressively noise is reduced. Higher values remove more noise but may affect audio quality."
-                valueLabel={`${noiseReductionIntensity[0]}%`}
-              />
+          {isInitializing ? (
+            <div className="flex items-center space-x-2 text-sm text-moroder-primary">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span>Initializing AI models...</span>
             </div>
-          )}
-          
-          <SwitchWithLabel
-            id="content-classification"
-            label="Content Classification"
-            checked={contentClassification}
-            onCheckedChange={setContentClassification}
-            disabled={disabled || !initStatus.contentClassifier}
-            icon={<Wand2 />}
-            iconColor="text-purple-500/70"
-            tooltip={
-              <>
-                <strong>YAMNet Classification:</strong> Identifies the audio content type to enable 
-                genre-specific optimizations and processing.
-              </>
-            }
-            beta={true}
-          />
-          
-          {contentClassification && (
-            <div className="ml-4">
+          ) : (
+            <>
               <SwitchWithLabel
-                id="auto-processing"
-                label="Auto-Optimize Processing"
-                checked={autoProcessing}
-                onCheckedChange={setAutoProcessing}
-                disabled={disabled}
-                tooltip="Automatically adjusts processing parameters based on the identified content type."
+                id="ai-noise-reduction"
+                label="AI Noise Suppression"
+                checked={aiNoiseReduction}
+                onCheckedChange={setAiNoiseReduction}
+                disabled={disabled || !initStatus.noiseProcessor}
+                icon={<Zap />}
+                iconColor="text-green-500/70"
+                tooltip={
+                  <>
+                    <strong>Advanced Noise Suppression:</strong> Uses neural networks to intelligently 
+                    remove background noise while preserving audio fidelity.
+                  </>
+                }
+                beta={true}
               />
-            </div>
+              
+              {aiNoiseReduction && (
+                <div className="space-y-4 ml-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="noise-strategy" className="text-xs">Suppression Strategy</Label>
+                    <Select 
+                      disabled={disabled} 
+                      value={noiseReductionStrategy} 
+                      onValueChange={(v) => setNoiseReductionStrategy(v as any)}
+                    >
+                      <SelectTrigger id="noise-strategy" className="bg-moroder-dark border border-moroder-primary/20 h-8 text-sm">
+                        <SelectValue placeholder="Select strategy" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="auto">Auto-detect</SelectItem>
+                        <SelectItem value="dtln">DTLN (Deep filtering)</SelectItem>
+                        <SelectItem value="spectral">Spectral Gating</SelectItem>
+                        <SelectItem value="nsnet">NSNet RNN</SelectItem>
+                        <SelectItem value="hybrid">Hybrid Blend</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <SliderWithLabel
+                    label="Suppression Intensity"
+                    value={noiseReductionIntensity}
+                    onValueChange={setNoiseReductionIntensity}
+                    min={0}
+                    max={100}
+                    step={1}
+                    disabled={disabled}
+                    tooltip="Controls how aggressively noise is reduced. Higher values remove more noise but may affect audio quality."
+                    valueLabel={`${noiseReductionIntensity[0]}%`}
+                  />
+                </div>
+              )}
+              
+              <SwitchWithLabel
+                id="content-classification"
+                label="Content Classification"
+                checked={contentClassification}
+                onCheckedChange={setContentClassification}
+                disabled={disabled || !initStatus.contentClassifier}
+                icon={<Wand2 />}
+                iconColor="text-purple-500/70"
+                tooltip={
+                  <>
+                    <strong>YAMNet Classification:</strong> Identifies the audio content type to enable 
+                    genre-specific optimizations and processing.
+                  </>
+                }
+                beta={true}
+              />
+              
+              {contentClassification && (
+                <div className="ml-4">
+                  <SwitchWithLabel
+                    id="auto-processing"
+                    label="Auto-Optimize Processing"
+                    checked={autoProcessing}
+                    onCheckedChange={setAutoProcessing}
+                    disabled={disabled}
+                    tooltip="Automatically adjusts processing parameters based on the identified content type."
+                  />
+                </div>
+              )}
+              
+              <SwitchWithLabel
+                id="artifact-elimination"
+                label="Artifact Elimination"
+                checked={artifactElimination}
+                onCheckedChange={setArtifactElimination}
+                disabled={disabled || !initStatus.artifactEliminator}
+                icon={<AlertCircle />}
+                iconColor="text-amber-500/70"
+                tooltip={
+                  <>
+                    <strong>Advanced Reconstruction:</strong> Detects and fixes audio artifacts like 
+                    clicks, pops, clipping and digital distortion using GANs.
+                  </>
+                }
+                beta={true}
+              />
+            </>
           )}
           
-          <SwitchWithLabel
-            id="artifact-elimination"
-            label="Artifact Elimination"
-            checked={artifactElimination}
-            onCheckedChange={setArtifactElimination}
-            disabled={disabled || !initStatus.artifactEliminator}
-            icon={<AlertCircle />}
-            iconColor="text-amber-500/70"
-            tooltip={
-              <>
-                <strong>Advanced Reconstruction:</strong> Detects and fixes audio artifacts like 
-                clicks, pops, clipping and digital distortion using GANs.
-              </>
-            }
-            beta={true}
-          />
-          
-          {!initStatus.overall && enableAI && (
+          {!initStatus.overall && enableAI && !isInitializing && (
             <div className="rounded-md bg-yellow-500/10 p-3 text-xs text-yellow-600">
               <div className="flex items-start gap-2">
                 <AlertCircle className="h-4 w-4 mt-0.5" />
                 <span>
-                  AI Models are still initializing. Some features may be temporarily disabled. 
-                  This can take a few seconds on the first use.
+                  Using simulated AI processing since models are not fully loaded.
+                  Real AI processing will work on devices with WebGPU support.
                 </span>
               </div>
             </div>

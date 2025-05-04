@@ -18,9 +18,14 @@ const SettingsTooltip: React.FC<SettingsTooltipProps> = ({
     <TooltipProvider>
       <Tooltip>
         <TooltipTrigger asChild>
-          {icon}
+          <span className="cursor-help">
+            {icon}
+          </span>
         </TooltipTrigger>
-        <TooltipContent sideOffset={sideOffset} className="max-w-[300px]">
+        <TooltipContent 
+          sideOffset={sideOffset} 
+          className="max-w-[300px] bg-moroder-dark/90 border border-moroder-primary/20 text-moroder-light z-50"
+        >
           {children}
         </TooltipContent>
       </Tooltip>
