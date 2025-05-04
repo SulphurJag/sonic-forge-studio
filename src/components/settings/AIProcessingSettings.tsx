@@ -1,19 +1,12 @@
 
-import React, { useState, useEffect } from 'react';
-import { Cpu, Zap, Wand2, AlertCircle, Loader2, MonitorSmartphone } from "lucide-react";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
+import React from 'react';
+import { Zap, Wand2, AlertCircle } from "lucide-react";
 import SwitchWithLabel from './SwitchWithLabel';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import SliderWithLabel from './SliderWithLabel';
 import { aiAudioProcessor } from '@/services/ai';
 import { toast } from "@/hooks/use-toast";
+import AIMainControl from './ai/AIMainControl';
+import NoiseReductionSettings from './ai/NoiseReductionSettings';
+import AIInitializationStatus from './ai/AIInitializationStatus';
 
 interface AIProcessingSettingsProps {
   enableAI: boolean;
@@ -115,34 +108,22 @@ const AIProcessingSettings: React.FC<AIProcessingSettingsProps> = ({
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <div className="flex flex-col">
-          <h3 className="text-sm font-medium flex items-center gap-2">
-            <Cpu className="h-4 w-4" /> AI Audio Processing
-            <span className="inline-flex items-center rounded-md bg-moroder-accent/20 px-2 py-0.5 text-xs font-medium text-moroder-accent">
-              Beta
-            </span>
-          </h3>
-          <p className="text-xs text-muted-foreground max-w-[300px] mt-1">
-            Advanced AI-powered processing for superior audio quality
-          </p>
-        </div>
-        <Switch
-          id="enable-ai"
-          disabled={disabled || isInitializing}
-          checked={enableAI}
-          onCheckedChange={handleEnableAI}
-        />
-      </div>
+      <AIMainControl 
+        enableAI={enableAI}
+        handleEnableAI={handleEnableAI}
+        disabled={disabled}
+        isInitializing={isInitializing}
+      />
       
       {enableAI && (
         <div className="space-y-4 pl-1 border-l-2 border-moroder-primary/20 ml-2">
-          {isInitializing ? (
-            <div className="flex items-center space-x-2 text-sm text-moroder-primary">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              <span>Initializing AI models...</span>
-            </div>
-          ) : (
+          <AIInitializationStatus 
+            isInitializing={isInitializing}
+            initStatus={initStatus}
+            enableAI={enableAI}
+          />
+          
+          {!isInitializing && (
             <>
               <SwitchWithLabel
                 id="ai-noise-reduction"
@@ -162,39 +143,13 @@ const AIProcessingSettings: React.FC<AIProcessingSettingsProps> = ({
               />
               
               {aiNoiseReduction && (
-                <div className="space-y-4 ml-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="noise-strategy" className="text-xs">Suppression Strategy</Label>
-                    <Select 
-                      disabled={disabled} 
-                      value={noiseReductionStrategy} 
-                      onValueChange={(v) => setNoiseReductionStrategy(v as any)}
-                    >
-                      <SelectTrigger id="noise-strategy" className="bg-moroder-dark border border-moroder-primary/20 h-8 text-sm">
-                        <SelectValue placeholder="Select strategy" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="auto">Auto-detect</SelectItem>
-                        <SelectItem value="dtln">DTLN (Deep filtering)</SelectItem>
-                        <SelectItem value="spectral">Spectral Gating</SelectItem>
-                        <SelectItem value="nsnet">NSNet RNN</SelectItem>
-                        <SelectItem value="hybrid">Hybrid Blend</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <SliderWithLabel
-                    label="Suppression Intensity"
-                    value={noiseReductionIntensity}
-                    onValueChange={setNoiseReductionIntensity}
-                    min={0}
-                    max={100}
-                    step={1}
-                    disabled={disabled}
-                    tooltip="Controls how aggressively noise is reduced. Higher values remove more noise but may affect audio quality."
-                    valueLabel={`${noiseReductionIntensity[0]}%`}
-                  />
-                </div>
+                <NoiseReductionSettings
+                  noiseReductionStrategy={noiseReductionStrategy}
+                  setNoiseReductionStrategy={setNoiseReductionStrategy}
+                  noiseReductionIntensity={noiseReductionIntensity}
+                  setNoiseReductionIntensity={setNoiseReductionIntensity}
+                  disabled={disabled}
+                />
               )}
               
               <SwitchWithLabel
@@ -244,29 +199,6 @@ const AIProcessingSettings: React.FC<AIProcessingSettingsProps> = ({
                 beta={true}
               />
             </>
-          )}
-          
-          {!initStatus.overall && enableAI && !isInitializing && (
-            <div className="rounded-md bg-yellow-500/10 p-3 text-xs text-yellow-600">
-              <div className="flex items-start gap-2">
-                <AlertCircle className="h-4 w-4 mt-0.5" />
-                <span>
-                  Using simulated AI processing since models are not fully loaded.
-                </span>
-              </div>
-            </div>
-          )}
-          
-          {!initStatus.hasWebGPU && enableAI && !isInitializing && initStatus.overall && (
-            <div className="rounded-md bg-blue-500/10 p-3 text-xs text-blue-600">
-              <div className="flex items-start gap-2">
-                <MonitorSmartphone className="h-4 w-4 mt-0.5" />
-                <span>
-                  Using simplified AI processing because WebGPU is not supported in your browser.
-                  For full AI capabilities, try Chrome 113+ or Edge 113+.
-                </span>
-              </div>
-            </div>
           )}
         </div>
       )}
