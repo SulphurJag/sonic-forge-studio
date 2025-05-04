@@ -1,7 +1,7 @@
 
 import * as ort from 'onnxruntime-web';
 import * as tf from '@tensorflow/tfjs';
-import { pipeline } from '@huggingface/transformers';
+import { pipeline, env } from '@huggingface/transformers';
 import { toast } from "@/hooks/use-toast";
 
 // Configuration for model paths and Hugging Face model IDs
@@ -174,7 +174,7 @@ class ModelManager {
   }
   
   // Load a Hugging Face Transformers model
-  async loadTransformersModel(task: string, modelId: string, modelKey: string): Promise<any> {
+  async loadTransformersModel(task: "audio-to-audio" | "automatic-speech-recognition" | "audio-classification", modelId: string, modelKey: string): Promise<any> {
     if (this.modelCache.has(modelKey)) {
       return this.modelCache.get(modelKey);
     }
@@ -187,6 +187,9 @@ class ModelManager {
     });
     
     try {
+      // Set up WebGPU if available
+      env.backends.onnx.wasm.wasmPaths = `${window.location.origin}/onnx/`;
+      
       // Load the pipeline with webgpu device if available, fallback to cpu
       const model = await pipeline(task, modelId, { 
         device: 'webgpu', 

@@ -26,7 +26,8 @@ const SettingsTooltip: React.FC<SettingsTooltipProps> = ({
         </TooltipTrigger>
         <TooltipContent 
           sideOffset={sideOffset} 
-          className={`max-w-[${maxWidth}] bg-moroder-dark/90 border border-moroder-primary/20 text-moroder-light z-50`}
+          className="bg-moroder-dark/90 border border-moroder-primary/20 text-moroder-light z-50"
+          style={{ maxWidth }}
         >
           {children}
         </TooltipContent>
