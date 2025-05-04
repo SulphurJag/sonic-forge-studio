@@ -1,4 +1,3 @@
-
 import { toast } from "@/hooks/use-toast";
 import { aiAudioProcessor } from "./aiAudioProcessing";
 
@@ -751,7 +750,7 @@ export class AudioMasteringEngine {
         toast({
           title: "AI Processing Failed",
           description: "Falling back to standard audio processing",
-          variant: "warning"
+          variant: "default"
         });
         // Continue with standard processing
       }
