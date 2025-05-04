@@ -176,7 +176,7 @@ class ModelManager {
   async loadTransformersModel(
     task: "feature-extraction" | "text-classification" | "token-classification" | 
           "question-answering" | "summarization" | "translation" | 
-          "text-generation" | "fill-mask" | "sentence-similarity" | 
+          "text-generation" | "fill-mask" | 
           "text-to-image" | "image-classification" | "image-segmentation" | 
           "object-detection" | "image-to-text" | "automatic-speech-recognition" | 
           "audio-classification" | "text-to-speech" | "zero-shot-classification",
