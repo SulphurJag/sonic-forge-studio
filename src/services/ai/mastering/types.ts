@@ -26,4 +26,12 @@ export interface AIInitializationStatus {
   artifactEliminator: boolean;
   overall: boolean;
   hasWebGPU: boolean;
+  usingSimulation: boolean;  // New field to track if using simulation
+}
+
+// Model loading progress
+export interface ModelLoadProgress {
+  modelName: string;
+  progress: number;
+  status: 'loading' | 'success' | 'error';
 }

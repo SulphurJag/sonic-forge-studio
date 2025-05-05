@@ -14,6 +14,7 @@ export class AIAudioMasteringEngine {
   private isInitialized: boolean = false;
   private isInitializing: boolean = false;
   private hasGPUSupport: boolean = false;
+  private usingSimulation: boolean = true;
   
   constructor() {
     this.noiseProcessor = new AINoiseSuppressionProcessor();
@@ -37,6 +38,7 @@ export class AIAudioMasteringEngine {
     this.isInitialized = result.isInitialized;
     this.hasGPUSupport = result.hasGPUSupport;
     this.isInitializing = result.isInitializing;
+    this.usingSimulation = result.usingSimulation;
     
     return this.isInitialized;
   }
@@ -46,6 +48,11 @@ export class AIAudioMasteringEngine {
     return this.isInitialized;
   }
   
+  // Check if the engine is using simulation mode
+  isUsingSimulation(): boolean {
+    return this.usingSimulation;
+  }
+  
   // Check initialization status of each component
   getInitializationStatus(): AIInitializationStatus {
     return getInitializationStatus(
@@ -53,7 +60,8 @@ export class AIAudioMasteringEngine {
       this.contentClassifier,
       this.artifactEliminator,
       this.isInitialized,
-      this.hasGPUSupport
+      this.hasGPUSupport,
+      this.usingSimulation
     );
   }
   

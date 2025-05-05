@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { AlertCircle, Loader2, MonitorSmartphone } from "lucide-react";
+import { Loader2, CheckCircle, AlertCircle, Cpu } from "lucide-react";
 
 interface AIInitializationStatusProps {
   isInitializing: boolean;
@@ -10,6 +10,7 @@ interface AIInitializationStatusProps {
     artifactEliminator: boolean;
     overall: boolean;
     hasWebGPU: boolean;
+    usingSimulation?: boolean;
   };
   enableAI: boolean;
 }
@@ -19,43 +20,75 @@ const AIInitializationStatus: React.FC<AIInitializationStatusProps> = ({
   initStatus,
   enableAI
 }) => {
+  const renderStatusIcon = (isReady: boolean) => {
+    if (isReady) {
+      return <CheckCircle className="h-4 w-4 text-green-500" />;
+    }
+    return <AlertCircle className="h-4 w-4 text-amber-500" />;
+  };
+
   if (isInitializing) {
     return (
-      <div className="flex items-center space-x-2 text-sm text-moroder-primary">
+      <div className="flex items-center justify-center space-x-2 py-2 text-moroder-primary">
         <Loader2 className="h-4 w-4 animate-spin" />
-        <span>Initializing AI models...</span>
+        <span className="text-sm">Initializing AI models...</span>
       </div>
     );
   }
-  
-  if (!initStatus.overall && enableAI && !isInitializing) {
-    return (
-      <div className="rounded-md bg-yellow-500/10 p-3 text-xs text-yellow-600">
-        <div className="flex items-start gap-2">
-          <AlertCircle className="h-4 w-4 mt-0.5" />
-          <span>
-            Using simulated AI processing since models are not fully loaded.
-          </span>
+
+  if (!enableAI) {
+    return null;
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between text-sm">
+        <span className="text-muted-foreground">Noise Processor:</span>
+        <div className="flex items-center space-x-1">
+          {renderStatusIcon(initStatus.noiseProcessor)}
+          <span>{initStatus.noiseProcessor ? 'Ready' : 'Not Ready'}</span>
         </div>
       </div>
-    );
-  }
-  
-  if (!initStatus.hasWebGPU && enableAI && !isInitializing && initStatus.overall) {
-    return (
-      <div className="rounded-md bg-blue-500/10 p-3 text-xs text-blue-600">
-        <div className="flex items-start gap-2">
-          <MonitorSmartphone className="h-4 w-4 mt-0.5" />
-          <span>
-            Using simplified AI processing because WebGPU is not supported in your browser.
-            For full AI capabilities, try Chrome 113+ or Edge 113+.
-          </span>
+      
+      <div className="flex items-center justify-between text-sm">
+        <span className="text-muted-foreground">Content Classifier:</span>
+        <div className="flex items-center space-x-1">
+          {renderStatusIcon(initStatus.contentClassifier)}
+          <span>{initStatus.contentClassifier ? 'Ready' : 'Not Ready'}</span>
         </div>
       </div>
-    );
-  }
-  
-  return null;
+      
+      <div className="flex items-center justify-between text-sm">
+        <span className="text-muted-foreground">Artifact Eliminator:</span>
+        <div className="flex items-center space-x-1">
+          {renderStatusIcon(initStatus.artifactEliminator)}
+          <span>{initStatus.artifactEliminator ? 'Ready' : 'Not Ready'}</span>
+        </div>
+      </div>
+      
+      <div className="flex items-center justify-between text-sm">
+        <span className="text-muted-foreground">Hardware Acceleration:</span>
+        <div className="flex items-center space-x-1">
+          {initStatus.hasWebGPU ? (
+            <CheckCircle className="h-4 w-4 text-green-500" />
+          ) : (
+            <AlertCircle className="h-4 w-4 text-amber-500" />
+          )}
+          <span>{initStatus.hasWebGPU ? 'WebGPU Active' : 'CPU Only'}</span>
+        </div>
+      </div>
+      
+      {initStatus.usingSimulation !== undefined && (
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-muted-foreground">Processing Mode:</span>
+          <div className="flex items-center space-x-1">
+            <Cpu className="h-4 w-4 text-blue-400" />
+            <span>{initStatus.usingSimulation ? 'Simulated Models' : 'Neural Network Models'}</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 };
 
 export default AIInitializationStatus;
