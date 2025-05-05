@@ -85,4 +85,3 @@ export type { ModelStatus };
 
 // Export the model manager instance
 export const modelManager = new ModelManager();
-
