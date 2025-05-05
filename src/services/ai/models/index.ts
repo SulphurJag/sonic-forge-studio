@@ -80,7 +80,9 @@ class ModelManager {
 }
 
 // Export model types and constants
-export { MODEL_PATHS, HF_MODELS, ModelStatus };
+export { MODEL_PATHS, HF_MODELS };
+export type { ModelStatus };
 
 // Export the model manager instance
 export const modelManager = new ModelManager();
+
