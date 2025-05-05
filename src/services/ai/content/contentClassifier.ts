@@ -1,5 +1,5 @@
 
-import { modelManager, HF_MODELS } from '../modelManager';
+import { modelManager, HF_MODELS } from '../models';
 import { toast } from "@/hooks/use-toast";
 import { ContentAnalytics } from './contentAnalytics';
 import { ContentTextAnalyzer } from './contentTextAnalyzer';

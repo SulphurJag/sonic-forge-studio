@@ -2,7 +2,7 @@
 import { AINoiseSuppressionProcessor } from './noiseSuppressionProcessor';
 import { AIContentClassifier } from './content/contentClassifier';
 import { AIArtifactEliminator } from './artifactEliminator';
-import { modelManager } from './modelManager';
+import { modelManager } from './models';
 import { toast } from "@/hooks/use-toast";
 
 // Main AI Audio Processing Engine that combines all components
