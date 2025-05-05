@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { ProcessingJob } from '@/services/redis';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -65,7 +64,7 @@ const ProcessingQueue: React.FC<ProcessingQueueProps> = ({
       </span>
     );
   };
-
+  
   return (
     <Card className="bg-moroder-dark/40 border-moroder-primary/20">
       <CardHeader>
