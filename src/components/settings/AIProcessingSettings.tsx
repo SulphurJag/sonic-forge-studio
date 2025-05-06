@@ -48,7 +48,8 @@ const AIProcessingSettings: React.FC<AIProcessingSettingsProps> = ({
     contentClassifier: false,
     artifactEliminator: false,
     overall: false,
-    hasWebGPU: false
+    hasWebGPU: false,
+    processingMode: undefined
   });
   
   const [isInitializing, setIsInitializing] = React.useState(false);
