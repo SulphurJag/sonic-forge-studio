@@ -28,4 +28,3 @@ export default defineConfig(({ mode }) => ({
     'process.version': JSON.stringify(''),
   }
 }));
-
