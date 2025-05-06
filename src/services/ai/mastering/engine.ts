@@ -5,6 +5,7 @@ import { AIArtifactEliminator } from '../artifactEliminator';
 import { initializeAIEngine, getInitializationStatus } from './initializeEngine';
 import { processAudioWithAI } from './processAudio';
 import { AIAudioProcessingSettings, AIAudioProcessingResult, AIInitializationStatus } from './types';
+import { ProcessingMode, modelManager } from '../models';
 
 // Main AI Audio Processing Engine that combines all components
 export class AIAudioMasteringEngine {
@@ -14,7 +15,7 @@ export class AIAudioMasteringEngine {
   private isInitialized: boolean = false;
   private isInitializing: boolean = false;
   private hasGPUSupport: boolean = false;
-  private usingSimulation: boolean = true;
+  private processingMode: ProcessingMode = ProcessingMode.REMOTE_API;
   
   constructor() {
     this.noiseProcessor = new AINoiseSuppressionProcessor();
@@ -38,7 +39,7 @@ export class AIAudioMasteringEngine {
     this.isInitialized = result.isInitialized;
     this.hasGPUSupport = result.hasGPUSupport;
     this.isInitializing = result.isInitializing;
-    this.usingSimulation = result.usingSimulation;
+    this.processingMode = result.processingMode;
     
     return this.isInitialized;
   }
@@ -48,9 +49,15 @@ export class AIAudioMasteringEngine {
     return this.isInitialized;
   }
   
-  // Check if the engine is using simulation mode
-  isUsingSimulation(): boolean {
-    return this.usingSimulation;
+  // Get the current processing mode
+  getProcessingMode(): ProcessingMode {
+    return this.processingMode;
+  }
+  
+  // Set the processing mode explicitly
+  setProcessingMode(mode: ProcessingMode): void {
+    this.processingMode = mode;
+    modelManager.setProcessingMode(mode);
   }
   
   // Check initialization status of each component
@@ -61,7 +68,7 @@ export class AIAudioMasteringEngine {
       this.artifactEliminator,
       this.isInitialized,
       this.hasGPUSupport,
-      this.usingSimulation
+      this.processingMode
     );
   }
   

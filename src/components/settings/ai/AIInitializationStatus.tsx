@@ -1,6 +1,7 @@
 
 import React from 'react';
-import { Loader2, CheckCircle, AlertCircle, Cpu } from "lucide-react";
+import { Loader2, CheckCircle, AlertCircle, Cpu, Cloud, Gpu } from "lucide-react";
+import { ProcessingMode } from '@/services/ai/models/modelTypes';
 
 interface AIInitializationStatusProps {
   isInitializing: boolean;
@@ -10,7 +11,7 @@ interface AIInitializationStatusProps {
     artifactEliminator: boolean;
     overall: boolean;
     hasWebGPU: boolean;
-    usingSimulation?: boolean;
+    processingMode?: ProcessingMode;
   };
   enableAI: boolean;
 }
@@ -78,15 +79,27 @@ const AIInitializationStatus: React.FC<AIInitializationStatusProps> = ({
         </div>
       </div>
       
-      {initStatus.usingSimulation !== undefined && (
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-muted-foreground">Processing Mode:</span>
-          <div className="flex items-center space-x-1">
-            <Cpu className="h-4 w-4 text-blue-400" />
-            <span>{initStatus.usingSimulation ? 'Simulated Models' : 'Neural Network Models'}</span>
-          </div>
+      <div className="flex items-center justify-between text-sm">
+        <span className="text-muted-foreground">Processing Mode:</span>
+        <div className="flex items-center space-x-1">
+          {initStatus.processingMode === ProcessingMode.LOCAL_WEBGPU ? (
+            <>
+              <Gpu className="h-4 w-4 text-blue-500" />
+              <span>Local WebGPU</span>
+            </>
+          ) : initStatus.processingMode === ProcessingMode.LOCAL_LIGHTWEIGHT ? (
+            <>
+              <Cpu className="h-4 w-4 text-purple-500" />
+              <span>Local Lightweight</span>
+            </>
+          ) : (
+            <>
+              <Cloud className="h-4 w-4 text-green-500" />
+              <span>Hugging Face Spaces API</span>
+            </>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 };

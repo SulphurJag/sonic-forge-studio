@@ -42,3 +42,17 @@ export const LIGHTWEIGHT_MODELS = {
   // For artifact detection - simple spectrogram analyzer
   ARTIFACT_DETECTOR: "https://cdn.jsdelivr.net/npm/audio-fft@1.0.3/dist/model.json"
 };
+
+// Hugging Face Spaces endpoints
+export const HF_SPACES_ENDPOINTS = {
+  NOISE_SUPPRESSION: "https://huggingface.co/spaces/audio-ai/noise-reduction-api",
+  CONTENT_CLASSIFICATION: "https://huggingface.co/spaces/audio-ai/content-classifier", 
+  ARTIFACT_DETECTION: "https://huggingface.co/spaces/audio-ai/artifact-detector"
+};
+
+// Processing mode options
+export enum ProcessingMode {
+  LOCAL_WEBGPU = "local_webgpu",
+  LOCAL_LIGHTWEIGHT = "local_lightweight",
+  REMOTE_API = "remote_api"
+}

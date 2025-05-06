@@ -1,85 +1,108 @@
 
 import { toast } from "@/hooks/use-toast";
 
-// Helper functions for notifications
-export const showInitSuccessNotification = (hasGPUSupport: boolean): void => {
+// Display notifications for AI initialization and processing
+
+// Success notification when all AI models are initialized
+export function showInitSuccessNotification(hasGPUSupport: boolean): void {
   toast({
     title: "AI Engine Ready",
-    description: hasGPUSupport ? 
-      "Audio processing AI features are now available" :
-      "Using simplified AI processing (WebGPU not supported)",
+    description: hasGPUSupport 
+      ? "All AI audio processing models initialized with GPU acceleration" 
+      : "All AI audio processing models initialized with CPU mode",
+    variant: "default",
+    duration: 5000
+  });
+}
+
+// Partial initialization notification
+export function showPartialInitNotification(): void {
+  toast({
+    title: "Limited AI Functionality",
+    description: "Some AI features may be unavailable due to partial initialization",
     variant: "default"
   });
-};
+}
 
-export const showPartialInitNotification = (): void => {
+// Error notification when AI initialization fails
+export function showInitErrorNotification(): void {
   toast({
-    title: "Partial Initialization",
-    description: "Some AI models could not be loaded. Limited functionality available.",
+    title: "AI Initialization Failed",
+    description: "Failed to initialize AI audio processing. Please try again.",
     variant: "destructive"
   });
-};
+}
 
-export const showInitErrorNotification = (): void => {
+// Notification for when WebGPU is not supported
+export function showWebGPUNotSupportedNotification(): void {
   toast({
-    title: "Initialization Error",
-    description: "Failed to initialize AI audio processing engine",
-    variant: "destructive"
+    title: "Hardware Acceleration Unavailable",
+    description: "Your device doesn't support WebGPU. Using cloud processing instead.",
+    variant: "default",
+    duration: 5000
   });
-};
+}
 
-export const showNoiseReductionNotification = (strategy: string): void => {
+// Notification for when remote API is active
+export function showRemoteAPIActiveNotification(): void {
   toast({
-    title: "AI Noise Reduction",
-    description: `Processing with ${strategy} strategy...`,
+    title: "Cloud Processing Active",
+    description: "Using Hugging Face Spaces for AI audio processing",
+    variant: "default",
+    duration: 5000
+  });
+}
+
+// Content classification notification
+export function showContentClassificationNotification(contentTypes: string[]): void {
+  toast({
+    title: "Content Classified",
+    description: `Detected content types: ${contentTypes.join(", ")}`,
     variant: "default"
   });
-};
+}
 
-export const showNoiseReductionCompleteNotification = (intensity: number): void => {
+// Noise reduction notification
+export function showNoiseReductionNotification(strategy: string): void {
+  toast({
+    title: "Processing Audio",
+    description: `Applying ${strategy} noise reduction...`,
+    variant: "default"
+  });
+}
+
+// Noise reduction complete notification
+export function showNoiseReductionCompleteNotification(intensity: number): void {
   toast({
     title: "Noise Reduction Complete",
-    description: `Reduced noise by approximately ${Math.round(intensity * 0.1)}dB`,
+    description: `Applied noise reduction with ${intensity}% intensity`,
     variant: "default"
   });
-};
+}
 
-export const showArtifactDetectedNotification = (): void => {
+// Artifact detected notification
+export function showArtifactDetectedNotification(): void {
   toast({
     title: "Artifacts Detected",
-    description: "Fixing audio problems...",
+    description: "Found audio issues that need correction",
     variant: "default"
   });
-};
+}
 
-export const showArtifactFixedNotification = (): void => {
+// Artifact fixed notification
+export function showArtifactFixedNotification(): void {
   toast({
-    title: "Artifact Elimination Complete",
-    description: "Audio quality has been improved",
+    title: "Audio Fixed",
+    description: "Successfully removed audio artifacts",
     variant: "default"
   });
-};
+}
 
-export const showContentClassificationNotification = (contentTypes: string[]): void => {
-  toast({
-    title: "Content Classification",
-    description: `Detected: ${contentTypes.join(', ')}`,
-    variant: "default"
-  });
-};
-
-export const showProcessingErrorNotification = (): void => {
+// Processing error notification
+export function showProcessingErrorNotification(): void {
   toast({
     title: "Processing Error",
-    description: "Failed to process audio with AI components",
+    description: "Failed to process audio. Please try again.",
     variant: "destructive"
   });
-};
-
-export const showWebGPUNotSupportedNotification = (): void => {
-  toast({
-    title: "WebGPU Not Supported",
-    description: "Your browser doesn't support WebGPU. Using simplified AI processing.",
-    variant: "default"
-  });
-};
+}

@@ -1,37 +1,33 @@
 
-// Types for AI Audio Mastering
+import { ProcessingMode } from "../models/modelTypes";
 
-// Settings for audio processing
+// Types for AI audio processing
+
+// Settings for AI audio processing
 export interface AIAudioProcessingSettings {
   enableNoiseReduction: boolean;
   noiseReductionStrategy: 'auto' | 'dtln' | 'spectral' | 'nsnet' | 'hybrid';
   noiseReductionIntensity: number;
+  preserveTone: boolean;
   enableContentClassification: boolean;
   enableAutoProcessing: boolean;
   enableArtifactElimination: boolean;
-  preserveTone: boolean;
+  processingMode?: ProcessingMode;
 }
 
-// Results from audio processing
+// Result of AI audio processing
 export interface AIAudioProcessingResult {
-  processedBuffer: AudioBuffer | null;
+  processedBuffer: AudioBuffer;
   contentType: string[];
   artifactsFound: boolean;
 }
 
-// Status of AI components
+// Status of AI component initialization
 export interface AIInitializationStatus {
   noiseProcessor: boolean;
   contentClassifier: boolean;
   artifactEliminator: boolean;
   overall: boolean;
   hasWebGPU: boolean;
-  usingSimulation: boolean;  // New field to track if using simulation
-}
-
-// Model loading progress
-export interface ModelLoadProgress {
-  modelName: string;
-  progress: number;
-  status: 'loading' | 'success' | 'error';
+  processingMode?: ProcessingMode;
 }

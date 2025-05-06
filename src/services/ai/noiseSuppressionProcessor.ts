@@ -1,5 +1,5 @@
 
-import { modelManager, HF_MODELS, LIGHTWEIGHT_MODELS } from './models';
+import { modelManager, HF_MODELS, LIGHTWEIGHT_MODELS, ProcessingMode } from './models';
 import { toast } from "@/hooks/use-toast";
 import * as tf from '@tensorflow/tfjs';
 
@@ -12,7 +12,6 @@ export class AINoiseSuppressionProcessor {
   private lightweightModel: any = null;
   private isInitialized: boolean = false;
   private hasGPUSupport: boolean = false;
-  private usingSimulation: boolean = false;
   
   // Initialize the noise suppression models
   async initialize(): Promise<boolean> {
@@ -21,20 +20,10 @@ export class AINoiseSuppressionProcessor {
       this.hasGPUSupport = await modelManager.checkWebGPUSupport();
       let modelLoaded = false;
       
-      // First try to load the lightweight model (works in most browsers)
-      try {
-        console.log("Loading lightweight noise suppression model...");
-        this.lightweightModel = await tf.loadLayersModel(LIGHTWEIGHT_MODELS.NOISE_REDUCTION);
-        if (this.lightweightModel) {
-          console.log("Lightweight noise suppression model loaded");
-          modelLoaded = true;
-        }
-      } catch (error) {
-        console.warn("Failed to load lightweight model:", error);
-      }
+      const processingMode = modelManager.getPreferredProcessingMode();
       
-      // If WebGPU is supported, try loading the HF transformers model as well
-      if (this.hasGPUSupport) {
+      // Load models based on preferred processing mode
+      if (processingMode === ProcessingMode.LOCAL_WEBGPU && this.hasGPUSupport) {
         try {
           console.log("Loading WebGPU-accelerated noise suppression model...");
           this.noiseSuppressionPipeline = await modelManager.loadTransformersModel(
@@ -49,21 +38,56 @@ export class AINoiseSuppressionProcessor {
           }
         } catch (transformersError) {
           console.warn("Failed to load WebGPU model:", transformersError);
+          // Fall back to remote API
+          toast({
+            title: "Model Loading Failed",
+            description: "Falling back to remote API for noise reduction",
+            variant: "default"
+          });
+        }
+      } else if (processingMode === ProcessingMode.LOCAL_LIGHTWEIGHT) {
+        try {
+          console.log("Loading lightweight noise suppression model...");
+          this.lightweightModel = await tf.loadLayersModel(LIGHTWEIGHT_MODELS.NOISE_REDUCTION);
+          if (this.lightweightModel) {
+            console.log("Lightweight noise suppression model loaded");
+            modelLoaded = true;
+          }
+        } catch (error) {
+          console.warn("Failed to load lightweight model:", error);
+          // Fall back to remote API
+          toast({
+            title: "Model Loading Failed",
+            description: "Falling back to remote API for noise reduction",
+            variant: "default"
+          });
         }
       }
       
-      if (!modelLoaded) {
-        console.warn("No models loaded, falling back to simulation mode");
-        this.usingSimulation = true;
-        toast({
-          title: "Limited Functionality",
-          description: "Using simulated noise reduction (no models could be loaded)",
-          variant: "default"
+      // Always check remote API connectivity
+      try {
+        // Perform a simple ping to the API to ensure it's available
+        await fetch(modelManager.getHuggingFaceSpacesAPI().API_BASE_URLs.NOISE_SUPPRESSION, {
+          method: 'HEAD'
         });
+        
+        console.log("Remote API for noise suppression is available");
+        modelLoaded = true;
+      } catch (apiError) {
+        console.warn("Remote API not available:", apiError);
+        
+        if (!modelLoaded) {
+          toast({
+            title: "Service Unavailable",
+            description: "Neither local models nor remote API are available for noise reduction",
+            variant: "destructive"
+          });
+          return false;
+        }
       }
       
-      // Mark as initialized even if using simulation
-      this.isInitialized = true;
+      // Mark as initialized if any method is available
+      this.isInitialized = modelLoaded;
       return this.isInitialized;
     } catch (error) {
       console.error("Failed to initialize noise suppression:", error);
@@ -73,23 +97,13 @@ export class AINoiseSuppressionProcessor {
         variant: "destructive"
       });
       
-      // Fallback to simulated mode
-      this.usingSimulation = true;
-      this.isInitialized = true;
-      console.log("Falling back to simulated noise suppression");
-      
-      return this.isInitialized;
+      return false;
     }
   }
   
   // Check if models are ready
   isReady(): boolean {
     return this.isInitialized;
-  }
-  
-  // Check if using simulated processing
-  isUsingSimulation(): boolean {
-    return this.usingSimulation;
   }
   
   // Process audio buffer with noise suppression
@@ -110,10 +124,10 @@ export class AINoiseSuppressionProcessor {
       const context = new AudioContext();
       let processedBuffer: AudioBuffer;
       
-      // -------- Use real models when available --------
+      const processingMode = modelManager.getPreferredProcessingMode();
       
-      // Try using the WebGPU accelerated model first if available
-      if (this.noiseSuppressionPipeline && this.hasGPUSupport && !this.usingSimulation) {
+      // Use the WebGPU accelerated model if available
+      if (processingMode === ProcessingMode.LOCAL_WEBGPU && this.noiseSuppressionPipeline && this.hasGPUSupport) {
         // Convert AudioBuffer to Float32Array for processing
         const inputArray = new Float32Array(audioBuffer.length * audioBuffer.numberOfChannels);
         
@@ -149,8 +163,8 @@ export class AINoiseSuppressionProcessor {
           }
         }
       } 
-      // Otherwise try the lightweight model
-      else if (this.lightweightModel && !this.usingSimulation) {
+      // Use the lightweight model if available and preferred
+      else if (processingMode === ProcessingMode.LOCAL_LIGHTWEIGHT && this.lightweightModel) {
         // Prepare input for TensorFlow.js model
         // Typically takes a spectrogram or audio features as input
         const channelData = audioBuffer.getChannelData(0); // Process first channel
@@ -198,30 +212,35 @@ export class AINoiseSuppressionProcessor {
           processedBuffer.copyToChannel(processedData, channel);
         }
       }
-      // Fall back to simulation if neither model is available
+      // Use Hugging Face Spaces API as fallback or if remote mode is preferred
       else {
-        // Create a new audio context for processing
+        // Extract audio data for processing
+        const channelData = audioBuffer.getChannelData(0);
+        
+        // Process via API
+        const processedData = await modelManager.getHuggingFaceSpacesAPI().processNoiseReduction(
+          channelData,
+          audioBuffer.sampleRate,
+          {
+            intensity: settings.intensity,
+            strategy: settings.strategy,
+            preserveTone: settings.preserveTone
+          }
+        );
+        
+        // Create output buffer
         processedBuffer = context.createBuffer(
           audioBuffer.numberOfChannels,
-          audioBuffer.length,
+          processedData.length,
           audioBuffer.sampleRate
         );
         
-        // Apply a simple gain reduction based on intensity (simulating noise reduction)
-        for (let channel = 0; channel < audioBuffer.numberOfChannels; channel++) {
-          const inputData = audioBuffer.getChannelData(channel);
-          const outputData = processedBuffer.getChannelData(channel);
-          
-          // Copy with slight processing to simulate noise reduction
-          const intensityFactor = settings.intensity / 100;
-          for (let i = 0; i < inputData.length; i++) {
-            // Simple noise gate simulation
-            if (Math.abs(inputData[i]) < 0.01 * intensityFactor) {
-              outputData[i] = 0; // Reduce low-amplitude signals (noise)
-            } else {
-              outputData[i] = inputData[i];
-            }
-          }
+        // Copy the processed data to the buffer
+        processedBuffer.copyToChannel(processedData, 0);
+        
+        // Copy to other channels if multi-channel
+        for (let channel = 1; channel < audioBuffer.numberOfChannels; channel++) {
+          processedBuffer.copyToChannel(processedData, channel);
         }
       }
       
@@ -239,7 +258,7 @@ export class AINoiseSuppressionProcessor {
   
   // Auto-detect optimal noise suppression strategy based on audio characteristics
   private detectOptimalStrategy(audioBuffer: AudioBuffer): 'dtln' | 'spectral' | 'nsnet' | 'hybrid' {
-    // Simplified detection logic
+    // Strategy selection logic
     if (audioBuffer.length < 48000) {
       return 'spectral';
     } else if (audioBuffer.duration > 60) {

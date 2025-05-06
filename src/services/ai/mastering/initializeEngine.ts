@@ -2,12 +2,13 @@
 import { AINoiseSuppressionProcessor } from '../noiseSuppressionProcessor';
 import { AIContentClassifier } from '../content/contentClassifier';
 import { AIArtifactEliminator } from '../artifactEliminator';
-import { modelManager } from '../models';
+import { modelManager, ProcessingMode } from '../models';
 import { 
   showInitSuccessNotification, 
   showPartialInitNotification, 
   showInitErrorNotification,
-  showWebGPUNotSupportedNotification
+  showWebGPUNotSupportedNotification,
+  showRemoteAPIActiveNotification
 } from './notifications';
 import { AIInitializationStatus } from './types';
 
@@ -21,11 +22,16 @@ export async function initializeAIEngine(
   isInitialized: boolean; 
   hasGPUSupport: boolean; 
   isInitializing: boolean;
-  usingSimulation: boolean;
+  processingMode: ProcessingMode;
 }> {
   if (isInitializing) {
     console.log("AI engine is already initializing");
-    return { isInitialized: false, hasGPUSupport: false, isInitializing: true, usingSimulation: true };
+    return { 
+      isInitialized: false, 
+      hasGPUSupport: false, 
+      isInitializing: true,
+      processingMode: ProcessingMode.REMOTE_API 
+    };
   }
   
   isInitializing = true;
@@ -36,7 +42,15 @@ export async function initializeAIEngine(
     
     if (!hasGPUSupport) {
       showWebGPUNotSupportedNotification();
-      console.log("WebGPU not supported - using lightweight or simulated AI processing");
+      console.log("WebGPU not supported - using remote API processing");
+      modelManager.setProcessingMode(ProcessingMode.REMOTE_API);
+    }
+    
+    // Get preferred processing mode
+    const processingMode = modelManager.getPreferredProcessingMode();
+    
+    if (processingMode === ProcessingMode.REMOTE_API) {
+      showRemoteAPIActiveNotification();
     }
     
     // Initialize all components in parallel
@@ -48,31 +62,34 @@ export async function initializeAIEngine(
     
     const isInitialized = results.every(result => result);
     
-    // Check if any component is using simulation
-    const usingSimulation = (
-      (noiseProcessor.isUsingSimulation && noiseProcessor.isUsingSimulation()) || 
-      (contentClassifier.isUsingSimulation && contentClassifier.isUsingSimulation()) || 
-      (artifactEliminator.isUsingSimulation && artifactEliminator.isUsingSimulation())
-    );
-    
     console.log(`AI audio mastering engine initialized: ${isInitialized}`);
-    console.log(`Using simulation: ${usingSimulation}`);
+    console.log(`Using processing mode: ${processingMode}`);
     
     if (isInitialized) {
-      if (usingSimulation) {
-        showPartialInitNotification();
-      } else {
+      if (processingMode === ProcessingMode.LOCAL_WEBGPU) {
         showInitSuccessNotification(hasGPUSupport);
+      } else {
+        showRemoteAPIActiveNotification();
       }
     } else {
       showPartialInitNotification();
     }
     
-    return { isInitialized, hasGPUSupport, isInitializing: false, usingSimulation };
+    return { 
+      isInitialized, 
+      hasGPUSupport, 
+      isInitializing: false, 
+      processingMode 
+    };
   } catch (error) {
     console.error("Failed to initialize AI audio engine:", error);
     showInitErrorNotification();
-    return { isInitialized: false, hasGPUSupport: false, isInitializing: false, usingSimulation: true };
+    return { 
+      isInitialized: false, 
+      hasGPUSupport: false, 
+      isInitializing: false, 
+      processingMode: ProcessingMode.REMOTE_API 
+    };
   }
 }
 
@@ -83,7 +100,7 @@ export function getInitializationStatus(
   artifactEliminator: AIArtifactEliminator,
   isInitialized: boolean,
   hasGPUSupport: boolean,
-  usingSimulation: boolean = true
+  processingMode: ProcessingMode = ProcessingMode.REMOTE_API
 ): AIInitializationStatus {
   return {
     noiseProcessor: noiseProcessor.isReady(),
@@ -91,6 +108,6 @@ export function getInitializationStatus(
     artifactEliminator: artifactEliminator.isReady(),
     overall: isInitialized,
     hasWebGPU: hasGPUSupport,
-    usingSimulation: usingSimulation
+    processingMode: processingMode
   };
 }

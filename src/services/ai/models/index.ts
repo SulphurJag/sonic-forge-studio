@@ -4,7 +4,8 @@ import { OnnxModelLoader } from './onnxModelLoader';
 import { TensorflowModelLoader } from './tensorflowModelLoader';
 import { TransformersModelLoader } from './transformersModelLoader';
 import { WebGpuDetector } from './webGpuDetector';
-import { MODEL_PATHS, HF_MODELS, LIGHTWEIGHT_MODELS, ModelStatus } from './modelTypes';
+import { HuggingFaceSpacesAPI } from './hugginFaceSpacesAPI';
+import { MODEL_PATHS, HF_MODELS, LIGHTWEIGHT_MODELS, ModelStatus, ProcessingMode, HF_SPACES_ENDPOINTS } from './modelTypes';
 import { toast } from "@/hooks/use-toast";
 
 // Main model manager that combines all loaders
@@ -13,18 +14,57 @@ class ModelManager {
   private onnxLoader: OnnxModelLoader;
   private tfLoader: TensorflowModelLoader;
   private transformersLoader: TransformersModelLoader;
+  private preferredProcessingMode: ProcessingMode = ProcessingMode.REMOTE_API;
   
   constructor() {
     // Initialize model status tracker with all model keys
     const allModelKeys = [
       ...Object.keys(MODEL_PATHS),
-      ...Object.keys(HF_MODELS)
+      ...Object.keys(HF_MODELS),
+      ...Object.keys(HF_SPACES_ENDPOINTS)
     ];
     
     this.statusTracker = new ModelStatusTracker(allModelKeys);
     this.onnxLoader = new OnnxModelLoader(this.statusTracker);
     this.tfLoader = new TensorflowModelLoader(this.statusTracker);
     this.transformersLoader = new TransformersModelLoader(this.statusTracker);
+    
+    // Determine preferred processing mode
+    this.detectOptimalProcessingMode();
+  }
+  
+  // Detect the optimal processing mode based on device capabilities
+  private async detectOptimalProcessingMode(): Promise<void> {
+    try {
+      const hasWebGPU = await WebGpuDetector.isWebGpuSupported();
+      
+      if (hasWebGPU) {
+        this.preferredProcessingMode = ProcessingMode.LOCAL_WEBGPU;
+        console.log("Using WebGPU for local model processing");
+      } else {
+        this.preferredProcessingMode = ProcessingMode.REMOTE_API;
+        console.log("Using remote API for model processing");
+        
+        toast({
+          title: "Using Remote Processing",
+          description: "Your device doesn't support WebGPU. Using cloud-based processing.",
+          variant: "default"
+        });
+      }
+    } catch (error) {
+      console.error("Error detecting processing mode:", error);
+      this.preferredProcessingMode = ProcessingMode.REMOTE_API;
+    }
+  }
+  
+  // Get the preferred processing mode
+  getPreferredProcessingMode(): ProcessingMode {
+    return this.preferredProcessingMode;
+  }
+  
+  // Set processing mode explicitly
+  setProcessingMode(mode: ProcessingMode): void {
+    this.preferredProcessingMode = mode;
   }
   
   // Check if a model is ready for inference
@@ -77,10 +117,15 @@ class ModelManager {
   async checkWebGPUSupport(): Promise<boolean> {
     return WebGpuDetector.isWebGpuSupported();
   }
+  
+  // Get API for Hugging Face Spaces
+  getHuggingFaceSpacesAPI(): typeof HuggingFaceSpacesAPI {
+    return HuggingFaceSpacesAPI;
+  }
 }
 
 // Export model types and constants
-export { MODEL_PATHS, HF_MODELS, LIGHTWEIGHT_MODELS };
+export { MODEL_PATHS, HF_MODELS, LIGHTWEIGHT_MODELS, HF_SPACES_ENDPOINTS, ProcessingMode };
 export type { ModelStatus };
 
 // Export the model manager instance
