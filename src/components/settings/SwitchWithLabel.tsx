@@ -41,7 +41,8 @@ const SwitchWithLabel: React.FC<SwitchWithLabelProps> = ({
           )}
         </Label>
         {tooltip && icon && (
-          <SettingsTooltip icon={React.cloneElement(icon as React.ReactElement, { className: `h-4 w-4 ${iconColor}` })}>
+          <SettingsTooltip>
+            {React.cloneElement(icon as React.ReactElement, { className: `h-4 w-4 ${iconColor}` })}
             {tooltip}
           </SettingsTooltip>
         )}

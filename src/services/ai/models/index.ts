@@ -4,7 +4,7 @@ import { OnnxModelLoader } from './onnxModelLoader';
 import { TensorflowModelLoader } from './tensorflowModelLoader';
 import { TransformersModelLoader } from './transformersModelLoader';
 import { WebGpuDetector } from './webGpuDetector';
-import { HuggingFaceSpacesAPI } from './hugginFaceSpacesAPI';
+import { huggingFaceSpacesAPI } from './hugginFaceSpacesAPI';
 import { MODEL_PATHS, HF_MODELS, LIGHTWEIGHT_MODELS, ModelStatus, ProcessingMode, HF_SPACES_ENDPOINTS } from './modelTypes';
 import { toast } from "@/hooks/use-toast";
 
@@ -119,8 +119,8 @@ class ModelManager {
   }
   
   // Get API for Hugging Face Spaces
-  getHuggingFaceSpacesAPI(): typeof HuggingFaceSpacesAPI {
-    return HuggingFaceSpacesAPI;
+  getHuggingFaceSpacesAPI() {
+    return huggingFaceSpacesAPI;
   }
 }
 

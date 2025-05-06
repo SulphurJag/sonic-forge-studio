@@ -43,7 +43,7 @@ interface ArtifactDetectionResponse {
 }
 
 // Hugging Face Spaces API implementation
-class HuggingFaceSpacesAPI {
+export class HuggingFaceSpacesAPI {
   private readonly noiseSuppressionEndpoint: string;
   private readonly contentClassifierEndpoint: string;
   private readonly artifactDetectorEndpoint: string;
