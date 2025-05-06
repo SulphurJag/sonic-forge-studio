@@ -1,280 +1,197 @@
 
-import { toast } from "@/hooks/use-toast";
+// Implements the Hugging Face Spaces API for remote AI audio processing
 
-// Hugging Face Spaces API integration
-export class HuggingFaceSpacesAPI {
-  private static readonly API_BASE_URLs = {
-    NOISE_SUPPRESSION: "https://api-inference.huggingface.co/models/speechbrain/mtl-mimic-voicebank",
-    CONTENT_CLASSIFICATION: "https://api-inference.huggingface.co/models/openai/whisper-tiny",
-    ARTIFACT_DETECTION: "https://api-inference.huggingface.co/models/microsoft/unispeech-sat-base"
-  };
+import { ProcessingMode } from "./modelTypes";
+
+// Types for API requests and responses
+interface NoiseSuppressionRequest {
+  audioData: Float32Array;
+  sampleRate: number;
+  strategy: string;
+  intensity: number;
+}
+
+interface NoiseSuppressionResponse {
+  processedAudio: Float32Array;
+  success: boolean;
+  message: string;
+}
+
+interface ContentClassificationRequest {
+  audioData: Float32Array;
+  sampleRate: number;
+}
+
+interface ContentClassificationResponse {
+  contentType: string[];
+  confidence: number[];
+  success: boolean;
+  message: string;
+}
+
+interface ArtifactDetectionRequest {
+  audioData: Float32Array;
+  sampleRate: number;
+}
+
+interface ArtifactDetectionResponse {
+  artifactsFound: boolean;
+  locations: number[];
+  types: string[];
+  success: boolean;
+  message: string;
+}
+
+// Hugging Face Spaces API implementation
+class HuggingFaceSpacesAPI {
+  private readonly noiseSuppressionEndpoint: string;
+  private readonly contentClassifierEndpoint: string;
+  private readonly artifactDetectorEndpoint: string;
   
-  private static readonly SPACES_API_URLs = {
-    NOISE_SUPPRESSION: "https://noise-reduction-api.hf.space/api",
-    CONTENT_CLASSIFICATION: "https://audio-content-classifier.hf.space/api",
-    ARTIFACT_DETECTION: "https://audio-artifact-detector.hf.space/api"
-  };
+  constructor() {
+    // Define the endpoints for the Hugging Face Spaces
+    this.noiseSuppressionEndpoint = "https://huggingface.co/spaces/audio-ai/noise-reduction-api/api";
+    this.contentClassifierEndpoint = "https://huggingface.co/spaces/audio-ai/content-classifier/api";
+    this.artifactDetectorEndpoint = "https://huggingface.co/spaces/audio-ai/artifact-detector/api";
+  }
   
-  // Process audio with noise suppression model on HF Spaces
-  static async processNoiseReduction(
-    audioData: Float32Array,
-    sampleRate: number,
-    options: {
-      intensity: number;
-      strategy: string;
-      preserveTone: boolean;
-    }
-  ): Promise<Float32Array> {
+  // Check if the API is available for remote processing
+  public async checkAvailability(): Promise<boolean> {
     try {
-      const formData = new FormData();
+      // Try a simple ping request to check if the service is up
+      const response = await fetch(`${this.noiseSuppressionEndpoint}/ping`, {
+        method: 'GET'
+      });
       
-      // Convert float32array to blob
-      const wavBlob = await this.float32ArrayToWavBlob(audioData, sampleRate);
-      formData.append('audio', wavBlob, 'input.wav');
-      formData.append('intensity', options.intensity.toString());
-      formData.append('strategy', options.strategy);
-      formData.append('preserveTone', options.preserveTone.toString());
+      return response.ok;
+    } catch (error) {
+      console.error("Failed to check Hugging Face Spaces API availability:", error);
+      return false;
+    }
+  }
+  
+  // Process audio with noise suppression
+  public async suppressNoise(
+    audioBuffer: AudioBuffer,
+    strategy: string = 'auto',
+    intensity: number = 0.5
+  ): Promise<AudioBuffer | null> {
+    try {
+      const audioData = audioBuffer.getChannelData(0);
       
-      const response = await fetch(this.SPACES_API_URLs.NOISE_SUPPRESSION, {
+      const request: NoiseSuppressionRequest = {
+        audioData: audioData,
+        sampleRate: audioBuffer.sampleRate,
+        strategy,
+        intensity
+      };
+      
+      const response = await fetch(`${this.noiseSuppressionEndpoint}/process`, {
         method: 'POST',
-        body: formData,
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(request)
       });
       
       if (!response.ok) {
-        throw new Error(`API request failed: ${response.statusText}`);
+        throw new Error(`API Error: ${response.status} ${response.statusText}`);
       }
       
-      const audioBlob = await response.blob();
-      const processedAudioBuffer = await this.wavBlobToFloat32Array(audioBlob);
+      const result: NoiseSuppressionResponse = await response.json();
       
-      return processedAudioBuffer;
+      if (!result.success) {
+        throw new Error(`Processing Error: ${result.message}`);
+      }
+      
+      // Create a new AudioBuffer with the processed audio data
+      const processedBuffer = new AudioContext().createBuffer(
+        1,
+        result.processedAudio.length,
+        audioBuffer.sampleRate
+      );
+      processedBuffer.getChannelData(0).set(result.processedAudio);
+      
+      return processedBuffer;
     } catch (error) {
-      console.error("Error in noise reduction API:", error);
-      toast({
-        title: "API Error",
-        description: "Failed to process audio through noise reduction API",
-        variant: "destructive"
-      });
-      throw error;
+      console.error("Failed to process audio with Hugging Face Spaces API:", error);
+      return null;
     }
   }
   
-  // Classify audio content using HF Spaces
-  static async classifyContent(
-    audioData: Float32Array, 
-    sampleRate: number
-  ): Promise<string[]> {
+  // Classify audio content
+  public async classifyContent(
+    audioBuffer: AudioBuffer
+  ): Promise<string[] | null> {
     try {
-      const formData = new FormData();
+      const audioData = audioBuffer.getChannelData(0);
       
-      // Convert float32array to blob
-      const wavBlob = await this.float32ArrayToWavBlob(audioData, sampleRate);
-      formData.append('audio', wavBlob, 'input.wav');
+      const request: ContentClassificationRequest = {
+        audioData: audioData,
+        sampleRate: audioBuffer.sampleRate
+      };
       
-      const response = await fetch(this.SPACES_API_URLs.CONTENT_CLASSIFICATION, {
+      const response = await fetch(`${this.contentClassifierEndpoint}/classify`, {
         method: 'POST',
-        body: formData,
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(request)
       });
       
       if (!response.ok) {
-        throw new Error(`API request failed: ${response.statusText}`);
+        throw new Error(`API Error: ${response.status} ${response.statusText}`);
       }
       
-      const result = await response.json();
+      const result: ContentClassificationResponse = await response.json();
       
-      if (result && result.classifications) {
-        return result.classifications;
+      if (!result.success) {
+        throw new Error(`Classification Error: ${result.message}`);
       }
       
-      return ['audio']; // Default fallback
+      return result.contentType;
     } catch (error) {
-      console.error("Error in content classification API:", error);
-      toast({
-        title: "API Error",
-        description: "Failed to classify audio content",
-        variant: "destructive"
-      });
-      throw error;
+      console.error("Failed to classify audio with Hugging Face Spaces API:", error);
+      return null;
     }
   }
   
-  // Detect artifacts in audio using HF Spaces
-  static async detectArtifacts(
-    audioData: Float32Array, 
-    sampleRate: number
-  ): Promise<{
-    hasClipping: boolean;
-    hasCrackles: boolean;
-    hasClicksAndPops: boolean;
-    problematicSegments: {start: number, end: number, type: string}[]
-  }> {
+  // Detect artifacts in audio
+  public async detectArtifacts(
+    audioBuffer: AudioBuffer
+  ): Promise<boolean | null> {
     try {
-      const formData = new FormData();
+      const audioData = audioBuffer.getChannelData(0);
       
-      // Convert float32array to blob
-      const wavBlob = await this.float32ArrayToWavBlob(audioData, sampleRate);
-      formData.append('audio', wavBlob, 'input.wav');
+      const request: ArtifactDetectionRequest = {
+        audioData: audioData,
+        sampleRate: audioBuffer.sampleRate
+      };
       
-      const response = await fetch(this.SPACES_API_URLs.ARTIFACT_DETECTION, {
+      const response = await fetch(`${this.artifactDetectorEndpoint}/detect`, {
         method: 'POST',
-        body: formData,
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(request)
       });
       
       if (!response.ok) {
-        throw new Error(`API request failed: ${response.statusText}`);
+        throw new Error(`API Error: ${response.status} ${response.statusText}`);
       }
       
-      return await response.json();
+      const result: ArtifactDetectionResponse = await response.json();
+      
+      if (!result.success) {
+        throw new Error(`Detection Error: ${result.message}`);
+      }
+      
+      return result.artifactsFound;
     } catch (error) {
-      console.error("Error in artifact detection API:", error);
-      toast({
-        title: "API Error",
-        description: "Failed to detect audio artifacts",
-        variant: "destructive"
-      });
-      throw error;
+      console.error("Failed to detect artifacts with Hugging Face Spaces API:", error);
+      return null;
     }
-  }
-  
-  // Fix artifacts in audio using HF Spaces
-  static async fixArtifacts(
-    audioData: Float32Array,
-    sampleRate: number,
-    options: {
-      fixClipping: boolean;
-      fixCrackles: boolean;
-      fixClicksAndPops: boolean;
-    }
-  ): Promise<Float32Array> {
-    try {
-      const formData = new FormData();
-      
-      // Convert float32array to blob
-      const wavBlob = await this.float32ArrayToWavBlob(audioData, sampleRate);
-      formData.append('audio', wavBlob, 'input.wav');
-      formData.append('fixClipping', options.fixClipping.toString());
-      formData.append('fixCrackles', options.fixCrackles.toString());
-      formData.append('fixClicksAndPops', options.fixClicksAndPops.toString());
-      
-      const response = await fetch(`${this.SPACES_API_URLs.ARTIFACT_DETECTION}/fix`, {
-        method: 'POST',
-        body: formData,
-      });
-      
-      if (!response.ok) {
-        throw new Error(`API request failed: ${response.statusText}`);
-      }
-      
-      const audioBlob = await response.blob();
-      const processedAudioBuffer = await this.wavBlobToFloat32Array(audioBlob);
-      
-      return processedAudioBuffer;
-    } catch (error) {
-      console.error("Error in artifact fixing API:", error);
-      toast({
-        title: "API Error",
-        description: "Failed to fix audio artifacts",
-        variant: "destructive"
-      });
-      throw error;
-    }
-  }
-  
-  // Helper method to convert Float32Array to WAV blob
-  private static async float32ArrayToWavBlob(
-    audioData: Float32Array, 
-    sampleRate: number
-  ): Promise<Blob> {
-    // Simple WAV file creation - real implementation would be more robust
-    const buffer = new ArrayBuffer(44 + audioData.length * 2);
-    const view = new DataView(buffer);
-    
-    // WAV header
-    // "RIFF" chunk descriptor
-    this.writeString(view, 0, 'RIFF');
-    view.setUint32(4, 32 + audioData.length * 2, true);
-    this.writeString(view, 8, 'WAVE');
-    
-    // "fmt " sub-chunk
-    this.writeString(view, 12, 'fmt ');
-    view.setUint32(16, 16, true); // subchunk size
-    view.setUint16(20, 1, true); // PCM format
-    view.setUint16(22, 1, true); // Mono channel
-    view.setUint32(24, sampleRate, true); // Sample rate
-    view.setUint32(28, sampleRate * 2, true); // Byte rate
-    view.setUint16(32, 2, true); // Block align
-    view.setUint16(34, 16, true); // Bits per sample
-    
-    // "data" sub-chunk
-    this.writeString(view, 36, 'data');
-    view.setUint32(40, audioData.length * 2, true);
-    
-    // Write audio data
-    const volume = 1;
-    let index = 44;
-    for (let i = 0; i < audioData.length; i++) {
-      view.setInt16(index, audioData[i] * (0x7FFF * volume), true);
-      index += 2;
-    }
-    
-    return new Blob([buffer], { type: 'audio/wav' });
-  }
-  
-  // Helper method to write a string to a DataView
-  private static writeString(view: DataView, offset: number, string: string): void {
-    for (let i = 0; i < string.length; i++) {
-      view.setUint8(offset + i, string.charCodeAt(i));
-    }
-  }
-  
-  // Helper method to convert WAV blob back to Float32Array
-  private static async wavBlobToFloat32Array(wavBlob: Blob): Promise<Float32Array> {
-    const arrayBuffer = await wavBlob.arrayBuffer();
-    const view = new DataView(arrayBuffer);
-    
-    // Parse WAV headers
-    const numChannels = view.getUint16(22, true);
-    const sampleRate = view.getUint32(24, true);
-    const bitsPerSample = view.getUint16(34, true);
-    
-    // Find the data section
-    let offset = 36;
-    while (
-      offset < arrayBuffer.byteLength && 
-      (view.getUint8(offset) !== 0x64 || // 'd'
-       view.getUint8(offset + 1) !== 0x61 || // 'a'
-       view.getUint8(offset + 2) !== 0x74 || // 't'
-       view.getUint8(offset + 3) !== 0x61) // 'a'
-    ) {
-      offset += 1;
-    }
-    
-    if (offset >= arrayBuffer.byteLength) {
-      throw new Error("Invalid WAV format: no 'data' section found");
-    }
-    
-    const dataChunkSize = view.getUint32(offset + 4, true);
-    const dataOffset = offset + 8;
-    
-    // Convert audio data
-    const numSamples = dataChunkSize / (bitsPerSample / 8) / numChannels;
-    const audioData = new Float32Array(numSamples);
-    
-    let sampleIndex = 0;
-    for (let i = 0; i < numSamples; i++) {
-      const sampleOffset = dataOffset + (i * (bitsPerSample / 8));
-      
-      if (bitsPerSample === 16) {
-        audioData[sampleIndex] = view.getInt16(sampleOffset, true) / 32768.0;
-      } else if (bitsPerSample === 8) {
-        audioData[sampleIndex] = (view.getUint8(sampleOffset) - 128) / 128.0;
-      } else if (bitsPerSample === 32) {
-        audioData[sampleIndex] = view.getFloat32(sampleOffset, true);
-      }
-      
-      sampleIndex++;
-    }
-    
-    return audioData;
   }
 }
+
+export const huggingFaceSpacesAPI = new HuggingFaceSpacesAPI();

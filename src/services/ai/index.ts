@@ -1,12 +1,9 @@
 
-import { AIAudioMasteringEngine } from './aiAudioMasteringEngine';
+import { AIAudioMasteringEngine } from './mastering/engine';
 
-// Export the main processor instance as a singleton
+// Create the AI audio processor singleton
 export const aiAudioProcessor = new AIAudioMasteringEngine();
 
-// Export all classes for individual use if needed
-export * from './modelManager';
-export * from './noiseSuppressionProcessor';
-export * from './content';
-export * from './artifactEliminator';
-export * from './aiAudioMasteringEngine';
+// Re-export other components
+export * from './models/modelTypes';
+export * from './mastering/types';
