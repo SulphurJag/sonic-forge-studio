@@ -67,8 +67,11 @@ export class AINoiseSuppressionProcessor {
       
       // Always check remote API connectivity
       try {
+        // Get the base URL from the huggingFaceSpacesAPI class
+        const baseUrl = huggingFaceSpacesAPI.API_BASE_URLs.NOISE_SUPPRESSION;
+        
         // Perform a simple ping to the API to ensure it's available
-        await fetch(huggingFaceSpacesAPI.API_BASE_URLs.NOISE_SUPPRESSION, {
+        await fetch(baseUrl, {
           method: 'HEAD'
         });
         

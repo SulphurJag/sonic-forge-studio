@@ -1,8 +1,12 @@
 
 import React from 'react';
-import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import SettingsTooltip from './SettingsTooltip';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface SwitchWithLabelProps {
   id: string;
@@ -10,10 +14,9 @@ interface SwitchWithLabelProps {
   checked: boolean;
   onCheckedChange: (checked: boolean) => void;
   disabled?: boolean;
-  tooltip?: React.ReactNode;
   icon?: React.ReactNode;
   iconColor?: string;
-  className?: string;
+  tooltip?: React.ReactNode;
   beta?: boolean;
 }
 
@@ -23,38 +26,43 @@ const SwitchWithLabel: React.FC<SwitchWithLabelProps> = ({
   checked,
   onCheckedChange,
   disabled = false,
-  tooltip,
   icon,
-  iconColor = "text-moroder-primary/60",
-  className = "",
+  iconColor = "text-blue-500/70",
+  tooltip,
   beta = false
 }) => {
   return (
-    <div className={`flex items-center justify-between ${className}`}>
-      <div className="flex items-center space-x-2">
-        <Label htmlFor={id} className="cursor-pointer flex items-center gap-2">
-          {label}
-          {beta && (
-            <span className="inline-flex items-center rounded-md bg-moroder-primary/20 px-2 py-0.5 text-xs font-medium">
-              Beta
-            </span>
+    <div className="flex items-center justify-between">
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div className="flex items-center gap-1.5">
+              {icon && <span className={iconColor}>{icon}</span>}
+              <label
+                htmlFor={id}
+                className={`text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 ${disabled ? 'text-muted-foreground' : ''}`}
+              >
+                {label}
+              </label>
+              {beta && (
+                <span className="inline-flex items-center rounded-md bg-moroder-accent/20 px-2 py-0.5 text-xs font-medium text-moroder-accent">
+                  Beta
+                </span>
+              )}
+            </div>
+          </TooltipTrigger>
+          {tooltip && (
+            <TooltipContent>
+              <div className="max-w-xs text-xs">{tooltip}</div>
+            </TooltipContent>
           )}
-        </Label>
-        {tooltip && icon && (
-          <SettingsTooltip>
-            {icon}
-            {tooltip}
-          </SettingsTooltip>
-        )}
-        {tooltip && !icon && (
-          <SettingsTooltip>{tooltip}</SettingsTooltip>
-        )}
-      </div>
+        </Tooltip>
+      </TooltipProvider>
       <Switch
         id={id}
-        disabled={disabled}
         checked={checked}
         onCheckedChange={onCheckedChange}
+        disabled={disabled}
       />
     </div>
   );

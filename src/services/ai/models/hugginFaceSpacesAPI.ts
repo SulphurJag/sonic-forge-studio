@@ -38,7 +38,7 @@ class HuggingFaceSpacesAPI {
   }
 
   // Public API for easier access
-  public get API_BASE_URLs() {
+  get API_BASE_URLs() {
     return API_BASE_URLs;
   }
   

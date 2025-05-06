@@ -34,7 +34,7 @@ export async function initializeAIEngine(
     };
   }
   
-  isInitializing = true;
+  let localIsInitializing = true;
   
   try {
     // Check for WebGPU support first
@@ -53,16 +53,18 @@ export async function initializeAIEngine(
       showRemoteAPIActiveNotification();
     }
     
-    // Initialize all components in parallel
-    const results = await Promise.all([
+    // Initialize all components in parallel with improved error handling
+    const results = await Promise.allSettled([
       noiseProcessor.initialize(),
       contentClassifier.initialize(),
       artifactEliminator.initialize()
     ]);
     
-    const isInitialized = results.every(result => result);
+    // Check if any components failed to initialize
+    const initStatus = results.map(result => result.status === 'fulfilled' && result.value);
+    const isInitialized = initStatus.some(status => status === true);
     
-    console.log(`AI audio mastering engine initialized: ${isInitialized}`);
+    console.log(`AI audio mastering engine initialization results:`, initStatus);
     console.log(`Using processing mode: ${processingMode}`);
     
     if (isInitialized) {
@@ -90,6 +92,8 @@ export async function initializeAIEngine(
       isInitializing: false, 
       processingMode: ProcessingMode.REMOTE_API 
     };
+  } finally {
+    localIsInitializing = false;
   }
 }
 
