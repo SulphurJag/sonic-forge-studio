@@ -2,6 +2,7 @@
 import { modelManager, HF_MODELS, LIGHTWEIGHT_MODELS, ProcessingMode } from './models';
 import { toast } from "@/hooks/use-toast";
 import * as tf from '@tensorflow/tfjs';
+import { huggingFaceSpacesAPI } from './models/hugginFaceSpacesAPI';
 
 // Class for Multi-Strategy Noise Suppression
 export class AINoiseSuppressionProcessor {
@@ -67,7 +68,7 @@ export class AINoiseSuppressionProcessor {
       // Always check remote API connectivity
       try {
         // Perform a simple ping to the API to ensure it's available
-        await fetch(modelManager.getHuggingFaceSpacesAPI().API_BASE_URLs.NOISE_SUPPRESSION, {
+        await fetch(huggingFaceSpacesAPI.API_BASE_URLs.NOISE_SUPPRESSION, {
           method: 'HEAD'
         });
         
@@ -218,7 +219,7 @@ export class AINoiseSuppressionProcessor {
         const channelData = audioBuffer.getChannelData(0);
         
         // Process via API
-        const processedData = await modelManager.getHuggingFaceSpacesAPI().processNoiseReduction(
+        const processedData = await huggingFaceSpacesAPI.processNoiseReduction(
           channelData,
           audioBuffer.sampleRate,
           {

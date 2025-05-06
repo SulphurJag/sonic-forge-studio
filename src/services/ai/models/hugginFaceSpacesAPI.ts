@@ -1,197 +1,207 @@
 
-// Implements the Hugging Face Spaces API for remote AI audio processing
+import { HF_SPACES_ENDPOINTS } from './modelTypes';
 
-import { ProcessingMode } from "./modelTypes";
+// API endpoints for Hugging Face Spaces
+const API_BASE_URLs = {
+  NOISE_SUPPRESSION: `${HF_SPACES_ENDPOINTS.NOISE_SUPPRESSOR}/api/process`,
+  CONTENT_CLASSIFIER: `${HF_SPACES_ENDPOINTS.CONTENT_CLASSIFIER}/api/classify`,
+  ARTIFACT_DETECTOR: `${HF_SPACES_ENDPOINTS.ARTIFACT_ELIMINATOR}/api/detect`,
+  ARTIFACT_REMOVER: `${HF_SPACES_ENDPOINTS.ARTIFACT_ELIMINATOR}/api/fix`
+};
 
-// Types for API requests and responses
-interface NoiseSuppressionRequest {
-  audioData: Float32Array;
-  sampleRate: number;
-  strategy: string;
+// Process options for noise reduction
+interface NoiseReductionOptions {
   intensity: number;
+  strategy: 'auto' | 'dtln' | 'spectral' | 'nsnet' | 'hybrid';
+  preserveTone: boolean;
 }
 
-interface NoiseSuppressionResponse {
-  processedAudio: Float32Array;
-  success: boolean;
-  message: string;
-}
-
-interface ContentClassificationRequest {
-  audioData: Float32Array;
-  sampleRate: number;
-}
-
-interface ContentClassificationResponse {
-  contentType: string[];
-  confidence: number[];
-  success: boolean;
-  message: string;
-}
-
-interface ArtifactDetectionRequest {
-  audioData: Float32Array;
-  sampleRate: number;
-}
-
-interface ArtifactDetectionResponse {
-  artifactsFound: boolean;
-  locations: number[];
-  types: string[];
-  success: boolean;
-  message: string;
+// Process options for artifact elimination
+interface ArtifactFixOptions {
+  fixClipping: boolean;
+  fixCrackles: boolean;
+  fixClicksAndPops: boolean;
 }
 
 // Hugging Face Spaces API implementation
-export class HuggingFaceSpacesAPI {
+class HuggingFaceSpacesAPI {
   private readonly noiseSuppressionEndpoint: string;
   private readonly contentClassifierEndpoint: string;
   private readonly artifactDetectorEndpoint: string;
+  private readonly artifactRemoverEndpoint: string;
   
   constructor() {
-    // Define the endpoints for the Hugging Face Spaces
-    this.noiseSuppressionEndpoint = "https://huggingface.co/spaces/audio-ai/noise-reduction-api/api";
-    this.contentClassifierEndpoint = "https://huggingface.co/spaces/audio-ai/content-classifier/api";
-    this.artifactDetectorEndpoint = "https://huggingface.co/spaces/audio-ai/artifact-detector/api";
+    this.noiseSuppressionEndpoint = API_BASE_URLs.NOISE_SUPPRESSION;
+    this.contentClassifierEndpoint = API_BASE_URLs.CONTENT_CLASSIFIER;
+    this.artifactDetectorEndpoint = API_BASE_URLs.ARTIFACT_DETECTOR;
+    this.artifactRemoverEndpoint = API_BASE_URLs.ARTIFACT_REMOVER;
+  }
+
+  // Public API for easier access
+  public get API_BASE_URLs() {
+    return API_BASE_URLs;
   }
   
-  // Check if the API is available for remote processing
-  public async checkAvailability(): Promise<boolean> {
+  // Process audio for noise reduction
+  async processNoiseReduction(
+    audioData: Float32Array,
+    sampleRate: number,
+    options: NoiseReductionOptions
+  ): Promise<Float32Array> {
     try {
-      // Try a simple ping request to check if the service is up
-      const response = await fetch(`${this.noiseSuppressionEndpoint}/ping`, {
-        method: 'GET'
-      });
+      console.log(`Processing noise reduction with strategy: ${options.strategy}, intensity: ${options.intensity}`);
       
-      return response.ok;
-    } catch (error) {
-      console.error("Failed to check Hugging Face Spaces API availability:", error);
-      return false;
-    }
-  }
-  
-  // Process audio with noise suppression
-  public async suppressNoise(
-    audioBuffer: AudioBuffer,
-    strategy: string = 'auto',
-    intensity: number = 0.5
-  ): Promise<AudioBuffer | null> {
-    try {
-      const audioData = audioBuffer.getChannelData(0);
+      // Convert audio data to format suitable for API
+      const audioBuffer = Array.from(audioData);
       
-      const request: NoiseSuppressionRequest = {
-        audioData: audioData,
-        sampleRate: audioBuffer.sampleRate,
-        strategy,
-        intensity
-      };
-      
-      const response = await fetch(`${this.noiseSuppressionEndpoint}/process`, {
+      // Post to API
+      const response = await fetch(this.noiseSuppressionEndpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(request)
+        body: JSON.stringify({
+          audio: audioBuffer,
+          sampleRate: sampleRate,
+          strategy: options.strategy,
+          intensity: options.intensity,
+          preserveTone: options.preserveTone
+        })
       });
       
       if (!response.ok) {
-        throw new Error(`API Error: ${response.status} ${response.statusText}`);
+        throw new Error(`API error: ${response.status}`);
       }
       
-      const result: NoiseSuppressionResponse = await response.json();
+      // Parse result
+      const result = await response.json();
       
-      if (!result.success) {
-        throw new Error(`Processing Error: ${result.message}`);
-      }
-      
-      // Create a new AudioBuffer with the processed audio data
-      const processedBuffer = new AudioContext().createBuffer(
-        1,
-        result.processedAudio.length,
-        audioBuffer.sampleRate
-      );
-      processedBuffer.getChannelData(0).set(result.processedAudio);
-      
-      return processedBuffer;
+      // Convert back to Float32Array
+      return new Float32Array(result.audio);
     } catch (error) {
-      console.error("Failed to process audio with Hugging Face Spaces API:", error);
-      return null;
+      console.error('Error processing noise reduction:', error);
+      // Return original audio on error
+      return audioData;
     }
   }
   
   // Classify audio content
-  public async classifyContent(
-    audioBuffer: AudioBuffer
-  ): Promise<string[] | null> {
+  async classifyContent(audioData: Float32Array, sampleRate: number): Promise<string[]> {
     try {
-      const audioData = audioBuffer.getChannelData(0);
+      // Convert audio data to format suitable for API
+      const audioBuffer = Array.from(audioData);
       
-      const request: ContentClassificationRequest = {
-        audioData: audioData,
-        sampleRate: audioBuffer.sampleRate
-      };
-      
-      const response = await fetch(`${this.contentClassifierEndpoint}/classify`, {
+      // Post to API
+      const response = await fetch(this.contentClassifierEndpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(request)
+        body: JSON.stringify({
+          audio: audioBuffer,
+          sampleRate: sampleRate
+        })
       });
       
       if (!response.ok) {
-        throw new Error(`API Error: ${response.status} ${response.statusText}`);
+        throw new Error(`API error: ${response.status}`);
       }
       
-      const result: ContentClassificationResponse = await response.json();
+      // Parse result
+      const result = await response.json();
       
-      if (!result.success) {
-        throw new Error(`Classification Error: ${result.message}`);
-      }
-      
-      return result.contentType;
+      return result.classifications || [];
     } catch (error) {
-      console.error("Failed to classify audio with Hugging Face Spaces API:", error);
-      return null;
+      console.error('Error classifying content:', error);
+      return [];
     }
   }
   
-  // Detect artifacts in audio
-  public async detectArtifacts(
-    audioBuffer: AudioBuffer
-  ): Promise<boolean | null> {
+  // Detect audio artifacts
+  async detectArtifacts(audioData: Float32Array, sampleRate: number): Promise<{
+    hasClipping: boolean;
+    hasCrackles: boolean;
+    hasClicksAndPops: boolean;
+  }> {
     try {
-      const audioData = audioBuffer.getChannelData(0);
+      // Convert audio data to format suitable for API
+      const audioBuffer = Array.from(audioData);
       
-      const request: ArtifactDetectionRequest = {
-        audioData: audioData,
-        sampleRate: audioBuffer.sampleRate
-      };
-      
-      const response = await fetch(`${this.artifactDetectorEndpoint}/detect`, {
+      // Post to API
+      const response = await fetch(this.artifactDetectorEndpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(request)
+        body: JSON.stringify({
+          audio: audioBuffer,
+          sampleRate: sampleRate
+        })
       });
       
       if (!response.ok) {
-        throw new Error(`API Error: ${response.status} ${response.statusText}`);
+        throw new Error(`API error: ${response.status}`);
       }
       
-      const result: ArtifactDetectionResponse = await response.json();
+      // Parse result
+      const result = await response.json();
       
-      if (!result.success) {
-        throw new Error(`Detection Error: ${result.message}`);
-      }
-      
-      return result.artifactsFound;
+      return {
+        hasClipping: result.hasClipping || false,
+        hasCrackles: result.hasCrackles || false,
+        hasClicksAndPops: result.hasClicksAndPops || false
+      };
     } catch (error) {
-      console.error("Failed to detect artifacts with Hugging Face Spaces API:", error);
-      return null;
+      console.error('Error detecting artifacts:', error);
+      return {
+        hasClipping: false,
+        hasCrackles: false,
+        hasClicksAndPops: false
+      };
+    }
+  }
+  
+  // Fix audio artifacts
+  async fixArtifacts(
+    audioData: Float32Array,
+    sampleRate: number,
+    options: ArtifactFixOptions
+  ): Promise<Float32Array> {
+    try {
+      // Convert audio data to format suitable for API
+      const audioBuffer = Array.from(audioData);
+      
+      // Post to API
+      const response = await fetch(this.artifactRemoverEndpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          audio: audioBuffer,
+          sampleRate: sampleRate,
+          fixClipping: options.fixClipping,
+          fixCrackles: options.fixCrackles,
+          fixClicksAndPops: options.fixClicksAndPops
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`);
+      }
+      
+      // Parse result
+      const result = await response.json();
+      
+      // Convert back to Float32Array
+      return new Float32Array(result.audio);
+    } catch (error) {
+      console.error('Error fixing artifacts:', error);
+      // Return original audio on error
+      return audioData;
     }
   }
 }
 
+// Export singleton instance
 export const huggingFaceSpacesAPI = new HuggingFaceSpacesAPI();

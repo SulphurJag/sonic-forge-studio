@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Loader2, CheckCircle, AlertCircle, Cpu, Cloud, Gpu } from "lucide-react";
+import { Loader2, CheckCircle, AlertCircle, Cpu, Cloud } from "lucide-react";
 import { ProcessingMode } from '@/services/ai/models/modelTypes';
 
 interface AIInitializationStatusProps {
@@ -84,7 +84,7 @@ const AIInitializationStatus: React.FC<AIInitializationStatusProps> = ({
         <div className="flex items-center space-x-1">
           {initStatus.processingMode === ProcessingMode.LOCAL_WEBGPU ? (
             <>
-              <Gpu className="h-4 w-4 text-blue-500" />
+              <Cpu className="h-4 w-4 text-blue-500" />
               <span>Local WebGPU</span>
             </>
           ) : initStatus.processingMode === ProcessingMode.LOCAL_LIGHTWEIGHT ? (

@@ -83,7 +83,6 @@ declare module 'lucide-react' {
   export const X: LucideIcon
   export const Cpu: LucideIcon
   export const Cloud: LucideIcon
-  export const Gpu: LucideIcon
   export const ArrowLeft: LucideIcon
   export const ArrowRight: LucideIcon
   export const Search: LucideIcon
@@ -96,6 +95,22 @@ declare module 'lucide-react' {
 // Fix missing @huggingface/transformers declarations
 declare module '@huggingface/transformers' {
   export * from '@huggingface/transformers'
+  
+  export function pipeline(
+    task: string,
+    model: string,
+    options?: any
+  ): Promise<any>;
+  
+  export const env: {
+    backends: {
+      onnx: {
+        wasm: {
+          wasmPaths: string;
+        };
+      };
+    };
+  };
 }
 
 // Define missing services
