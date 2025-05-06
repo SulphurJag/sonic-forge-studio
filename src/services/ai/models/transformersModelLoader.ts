@@ -30,7 +30,7 @@ export class TransformersModelLoader {
     this.statusTracker.setLoading(modelKey);
     
     try {
-      // Since we're having issues with transformers.js imports, we'll use our mock implementation
+      // Since transformers.js may not be fully available, create a mockup implementation
       // that will be compatible with our usage patterns
       console.log(`Loading model ${modelKey} (${modelId}) for task ${task}`);
       
