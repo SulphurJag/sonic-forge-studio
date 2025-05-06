@@ -64,7 +64,7 @@ export class AIContentClassifier {
         toast({
           title: "Limited Functionality",
           description: "Using simulated content classification (no models could be loaded)",
-          variant: "warning"
+          variant: "default"
         });
       }
       

@@ -74,8 +74,8 @@ export async function processAudioWithAI(
     
     // Step 4: Artifact elimination (if enabled)
     if (settings.enableArtifactElimination) {
-      // Detect artifacts
-      const artifactAnalysis = artifactEliminator.detectArtifacts(currentBuffer);
+      // Detect artifacts - await the result first
+      const artifactAnalysis = await artifactEliminator.detectArtifacts(currentBuffer);
       result.artifactsFound = artifactAnalysis.hasClipping || 
         artifactAnalysis.hasCrackles || 
         artifactAnalysis.hasClicksAndPops;

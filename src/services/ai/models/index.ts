@@ -4,7 +4,7 @@ import { OnnxModelLoader } from './onnxModelLoader';
 import { TensorflowModelLoader } from './tensorflowModelLoader';
 import { TransformersModelLoader } from './transformersModelLoader';
 import { WebGpuDetector } from './webGpuDetector';
-import { MODEL_PATHS, HF_MODELS, ModelStatus } from './modelTypes';
+import { MODEL_PATHS, HF_MODELS, LIGHTWEIGHT_MODELS, ModelStatus } from './modelTypes';
 import { toast } from "@/hooks/use-toast";
 
 // Main model manager that combines all loaders
@@ -80,7 +80,7 @@ class ModelManager {
 }
 
 // Export model types and constants
-export { MODEL_PATHS, HF_MODELS };
+export { MODEL_PATHS, HF_MODELS, LIGHTWEIGHT_MODELS };
 export type { ModelStatus };
 
 // Export the model manager instance

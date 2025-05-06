@@ -56,7 +56,7 @@ export class AIArtifactEliminator {
         toast({
           title: "Limited Functionality",
           description: "Using simulated artifact detection (no models could be loaded)",
-          variant: "warning"
+          variant: "default"
         });
       }
       

@@ -1,3 +1,4 @@
+
 import { modelManager, HF_MODELS, LIGHTWEIGHT_MODELS } from './models';
 import { toast } from "@/hooks/use-toast";
 import * as tf from '@tensorflow/tfjs';
@@ -57,7 +58,7 @@ export class AINoiseSuppressionProcessor {
         toast({
           title: "Limited Functionality",
           description: "Using simulated noise reduction (no models could be loaded)",
-          variant: "warning"
+          variant: "default"
         });
       }
       
