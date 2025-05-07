@@ -26,5 +26,12 @@ export default defineConfig(({ mode }) => ({
     'process.env': {},
     'process.platform': JSON.stringify('browser'),
     'process.version': JSON.stringify(''),
-  }
+  },
+  build: {
+    outDir: 'dist',
+    sourcemap: true,
+    commonjsOptions: {
+      transformMixedEsModules: true,
+    },
+  },
 }));
