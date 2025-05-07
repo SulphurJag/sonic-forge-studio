@@ -22,7 +22,7 @@ const BeatCorrectionMode: React.FC<BeatCorrectionModeProps> = ({
 
   return (
     <div className="mt-2 space-y-2">
-      <Label className="text-sm">Beat Alignment Mode</Label>
+      <Label>Beat Alignment Mode</Label>
       <ToggleGroup 
         type="single" 
         variant="outline"

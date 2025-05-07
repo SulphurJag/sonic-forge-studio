@@ -22,13 +22,13 @@ const ModeSelector: React.FC<ModeSelectorProps> = ({
 }) => {
   return (
     <div className="space-y-2">
-      <Label htmlFor="mode">Processing Mode</Label>
+      <Label>Processing Mode</Label>
       <Select 
         disabled={disabled} 
         value={mode} 
         onValueChange={onModeChange}
       >
-        <SelectTrigger id="mode" className="bg-moroder-dark border border-moroder-primary/20">
+        <SelectTrigger className="bg-moroder-dark border border-moroder-primary/20">
           <SelectValue placeholder="Select mode" />
         </SelectTrigger>
         <SelectContent>

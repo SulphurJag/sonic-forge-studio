@@ -37,7 +37,7 @@ const SliderWithLabel: React.FC<SliderWithLabelProps> = ({
     <div className="space-y-2">
       <div className="flex justify-between">
         <div className="flex items-center space-x-2">
-          <Label htmlFor={id}>{label}</Label>
+          <Label>{label}</Label>
           {tooltip && <SettingsTooltip icon={icon}>{tooltip}</SettingsTooltip>}
         </div>
         <span className="text-sm text-muted-foreground">
@@ -45,7 +45,6 @@ const SliderWithLabel: React.FC<SliderWithLabelProps> = ({
         </span>
       </div>
       <Slider
-        id={id}
         disabled={disabled}
         min={min}
         max={max}

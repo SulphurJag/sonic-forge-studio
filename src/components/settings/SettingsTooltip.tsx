@@ -19,7 +19,7 @@ const SettingsTooltip: React.FC<SettingsTooltipProps> = ({
   return (
     <TooltipProvider>
       <Tooltip delayDuration={200}>
-        <TooltipTrigger asChild>
+        <TooltipTrigger>
           <span className="cursor-help">
             {icon}
           </span>
