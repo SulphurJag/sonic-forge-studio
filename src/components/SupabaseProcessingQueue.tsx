@@ -13,13 +13,40 @@ import {
   TableRow
 } from "@/components/ui/table";
 import { format } from 'date-fns';
+import { AlertTriangle } from 'lucide-react';
+import { Button } from "@/components/ui/button";
 
 const SupabaseProcessingQueue: React.FC = () => {
   const { 
     queuedJobs, 
     completedJobs, 
-    isLoading
+    isLoading,
+    isSupabaseConfigured
   } = useSupabaseProcessingQueue();
+  
+  if (!isSupabaseConfigured) {
+    return (
+      <Card className="bg-moroder-dark/40 border-moroder-primary/20">
+        <CardHeader>
+          <CardTitle>Processing Queue</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col items-center justify-center p-6 space-y-4 text-center">
+            <AlertTriangle className="h-12 w-12 text-amber-500" />
+            <h3 className="text-xl font-medium">Supabase Connection Error</h3>
+            <p className="text-muted-foreground">
+              Supabase URL or Anonymous Key is missing. Please set the environment variables to enable the Supabase processing queue.
+            </p>
+            <div className="bg-slate-800/50 p-4 rounded-md w-full max-w-md">
+              <p className="text-sm font-mono mb-2">To enable Supabase, set these variables:</p>
+              <p className="text-xs font-mono text-amber-300">VITE_SUPABASE_URL=your_supabase_url</p>
+              <p className="text-xs font-mono text-amber-300">VITE_SUPABASE_ANON_KEY=your_supabase_anon_key</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
   
   if (isLoading) {
     return (

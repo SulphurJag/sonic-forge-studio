@@ -1,7 +1,7 @@
 
 import { useEffect, useState } from 'react';
 import { toast } from './use-toast';
-import { supabase, ProcessingJob } from '../services/supabase';
+import { supabase, ProcessingJob, isSupabaseConfigured } from '../services/supabase';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 export const useSupabaseProcessingQueue = () => {
@@ -9,13 +9,21 @@ export const useSupabaseProcessingQueue = () => {
   
   // Fetch processing jobs
   const fetchJobs = async () => {
-    const { data: queuedJobs, error: queuedError } = await supabase
+    if (!isSupabaseConfigured()) {
+      console.warn('Supabase is not properly configured. Please set the environment variables.');
+      return {
+        queuedJobs: [],
+        completedJobs: []
+      };
+    }
+    
+    const { data: queuedJobs, error: queuedError } = await supabase!
       .from('processing_jobs')
       .select('*')
       .order('created_at', { ascending: false })
       .eq('status', 'pending');
       
-    const { data: completedJobs, error: completedError } = await supabase
+    const { data: completedJobs, error: completedError } = await supabase!
       .from('processing_jobs')
       .select('*')
       .order('created_at', { ascending: false })
@@ -45,12 +53,18 @@ export const useSupabaseProcessingQueue = () => {
     refetch 
   } = useQuery({
     queryKey: ['processingJobs'],
-    queryFn: fetchJobs
+    queryFn: fetchJobs,
+    // Don't attempt to fetch if Supabase is not configured
+    enabled: isSupabaseConfigured()
   });
   
   // Mutation for adding a job
   const addJobMutation = useMutation({
     mutationFn: async ({ file, settings }: { file: File, settings: any }) => {
+      if (!isSupabaseConfigured()) {
+        throw new Error('Supabase is not properly configured');
+      }
+      
       const newJob: ProcessingJob = {
         file_name: file.name,
         file_size: file.size,
@@ -58,7 +72,7 @@ export const useSupabaseProcessingQueue = () => {
         status: 'pending'
       };
       
-      const { data, error } = await supabase
+      const { data, error } = await supabase!
         .from('processing_jobs')
         .insert([newJob])
         .select();
@@ -85,12 +99,22 @@ export const useSupabaseProcessingQueue = () => {
   
   // Add a new job to the queue
   const addJob = async (file: File, settings: any) => {
+    if (!isSupabaseConfigured()) {
+      toast({
+        title: "Supabase Not Configured",
+        description: "Please set the Supabase URL and Anonymous Key environment variables.",
+        variant: "destructive"
+      });
+      return;
+    }
     return addJobMutation.mutate({ file, settings });
   };
   
   // Set up real-time updates
   useEffect(() => {
-    const channel = supabase
+    if (!isSupabaseConfigured()) return;
+    
+    const channel = supabase!
       .channel('processing_jobs_changes')
       .on('postgres_changes', 
         { 
@@ -106,7 +130,9 @@ export const useSupabaseProcessingQueue = () => {
       .subscribe();
       
     return () => {
-      supabase.removeChannel(channel);
+      if (isSupabaseConfigured()) {
+        supabase!.removeChannel(channel);
+      }
     };
   }, [refetch]);
   
@@ -115,6 +141,7 @@ export const useSupabaseProcessingQueue = () => {
     completedJobs: data?.completedJobs || [],
     isLoading,
     error,
-    addJob
+    addJob,
+    isSupabaseConfigured: isSupabaseConfigured()
   };
 };
