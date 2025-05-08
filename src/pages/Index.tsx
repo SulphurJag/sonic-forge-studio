@@ -14,8 +14,11 @@ import SettingsPanel from "@/components/SettingsPanel";
 import MeteringDisplay from "@/components/MeteringDisplay";
 import ProcessingStatus from "@/components/ProcessingStatus";
 import ProcessingQueue from "@/components/ProcessingQueue";
+import SupabaseProcessingQueue from "@/components/SupabaseProcessingQueue";
 import { useProcessingQueue } from "@/hooks/use-processing-queue";
+import { useSupabaseProcessingQueue } from "@/hooks/use-processing-queue-supabase";
 import { audioProcessor, ProcessingResults } from "@/services/audioProcessing";
+import { supabase } from "@/services/supabase";
 
 const Index = () => {
   const location = useLocation();
@@ -46,13 +49,17 @@ const Index = () => {
   // Processing results
   const [processingResults, setProcessingResults] = useState<ProcessingResults | null>(null);
   
-  // Redis processing queue hook
+  // Use both Redis and Supabase processing queue hooks
   const { 
     queuedJobs, 
     completedJobs, 
     isLoading: isQueueLoading,
     addJob
   } = useProcessingQueue();
+  
+  const {
+    addJob: addSupabaseJob
+  } = useSupabaseProcessingQueue();
 
   // Initialize audio processor
   useEffect(() => {
@@ -147,8 +154,9 @@ const Index = () => {
     try {
       console.log("Starting audio processing with settings:", processingSettings);
       
-      // Add the file to the Redis processing queue for tracking
+      // Add the file to both the Redis processing queue and Supabase for tracking
       await addJob(audioFile, processingSettings);
+      await addSupabaseJob(audioFile, processingSettings);
       
       // Process progress simulation
       const progressInterval = setInterval(() => {
@@ -363,11 +371,24 @@ const Index = () => {
           </TabsContent>
 
           <TabsContent value="queue" className="space-y-6">
-            <ProcessingQueue 
-              queuedJobs={queuedJobs}
-              completedJobs={completedJobs}
-              isLoading={isQueueLoading}
-            />
+            <Tabs defaultValue="local">
+              <TabsList className="mb-4">
+                <TabsTrigger value="local">Local Queue</TabsTrigger>
+                <TabsTrigger value="supabase">Supabase Queue</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="local">
+                <ProcessingQueue 
+                  queuedJobs={queuedJobs}
+                  completedJobs={completedJobs}
+                  isLoading={isQueueLoading}
+                />
+              </TabsContent>
+              
+              <TabsContent value="supabase">
+                <SupabaseProcessingQueue />
+              </TabsContent>
+            </Tabs>
           </TabsContent>
         </Tabs>
       </main>
