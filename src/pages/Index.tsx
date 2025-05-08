@@ -15,6 +15,7 @@ import MeteringDisplay from "@/components/MeteringDisplay";
 import ProcessingStatus from "@/components/ProcessingStatus";
 import ProcessingQueue from "@/components/ProcessingQueue";
 import SupabaseProcessingQueue from "@/components/SupabaseProcessingQueue";
+import SupabaseConfigHelper from "@/components/SupabaseConfigHelper";
 import { useProcessingQueue } from "@/hooks/use-processing-queue";
 import { useSupabaseProcessingQueue } from "@/hooks/use-processing-queue-supabase";
 import { audioProcessor, ProcessingResults } from "@/services/audioProcessing";
@@ -246,6 +247,7 @@ const Index = () => {
             <TabsTrigger value="queue">Processing Queue</TabsTrigger>
           </TabsList>
           
+          {/* Upload tab */}
           <TabsContent value="upload" className="space-y-6">
             <div className="grid gap-6">
               <Card className="bg-moroder-dark/40 border-moroder-primary/20">
@@ -259,6 +261,9 @@ const Index = () => {
                   <AudioUploader onFileSelected={handleFileSelected} />
                 </CardContent>
               </Card>
+              
+              {/* Supabase Configuration Helper Card */}
+              <SupabaseConfigHelper />
               
               <Card className="bg-moroder-dark/40 border-moroder-primary/20">
                 <CardHeader>

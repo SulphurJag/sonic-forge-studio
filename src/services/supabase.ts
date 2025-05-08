@@ -1,17 +1,28 @@
 
 import { createClient } from '@supabase/supabase-js';
 
-// Initialize Supabase client with fallbacks for development
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+// Try to get Supabase credentials from environment variables or localStorage
+let supabaseUrl = '';
+let supabaseAnonKey = '';
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('Supabase URL or Anon Key is missing. Please set the environment variables.');
+// Check environment variables first
+if (typeof import.meta !== 'undefined') {
+  supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+  supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 }
 
-// Create a single supabase client for interacting with your database
-export const supabase = supabaseUrl && supabaseAnonKey 
-  ? createClient(supabaseUrl, supabaseAnonKey)
+// Fall back to localStorage if environment variables aren't set
+if (!supabaseUrl && typeof window !== 'undefined') {
+  supabaseUrl = localStorage.getItem('VITE_SUPABASE_URL') || '';
+}
+
+if (!supabaseAnonKey && typeof window !== 'undefined') {
+  supabaseAnonKey = localStorage.getItem('VITE_SUPABASE_ANON_KEY') || '';
+}
+
+// Create a supabase client, which will be null if credentials are missing
+export const supabase = (supabaseUrl && supabaseAnonKey) 
+  ? createClient(supabaseUrl, supabaseAnonKey) 
   : null;
 
 // Helper function to check if Supabase is properly configured
