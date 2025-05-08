@@ -1,29 +1,27 @@
 
 import { createClient } from '@supabase/supabase-js';
 
-// Try to get Supabase credentials from environment variables or localStorage
-let supabaseUrl = '';
-let supabaseAnonKey = '';
+// Set default Supabase credentials
+let supabaseUrl = 'https://frftshhvidkpdqtehmha.supabase.co';
+let supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZyZnRzaGh2aWRrcGRxdGVobWhhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDY2ODA5MjIsImV4cCI6MjA2MjI1NjkyMn0.IgqWOqxm9Wbjyh3bYNWwLMPIf0JqRRXZPcGP2ot59Mo';
 
-// Check environment variables first
+// Check environment variables if they exist (override defaults)
 if (typeof import.meta !== 'undefined') {
-  supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-  supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+  supabaseUrl = import.meta.env.VITE_SUPABASE_URL || supabaseUrl;
+  supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || supabaseAnonKey;
 }
 
-// Fall back to localStorage if environment variables aren't set
-if (!supabaseUrl && typeof window !== 'undefined') {
-  supabaseUrl = localStorage.getItem('VITE_SUPABASE_URL') || '';
+// Check localStorage if set (override defaults and environment variables)
+if (typeof window !== 'undefined') {
+  const storedUrl = localStorage.getItem('VITE_SUPABASE_URL');
+  const storedKey = localStorage.getItem('VITE_SUPABASE_ANON_KEY');
+  
+  if (storedUrl) supabaseUrl = storedUrl;
+  if (storedKey) supabaseAnonKey = storedKey;
 }
 
-if (!supabaseAnonKey && typeof window !== 'undefined') {
-  supabaseAnonKey = localStorage.getItem('VITE_SUPABASE_ANON_KEY') || '';
-}
-
-// Create a supabase client, which will be null if credentials are missing
-export const supabase = (supabaseUrl && supabaseAnonKey) 
-  ? createClient(supabaseUrl, supabaseAnonKey) 
-  : null;
+// Create a supabase client
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 // Helper function to check if Supabase is properly configured
 export const isSupabaseConfigured = () => {
