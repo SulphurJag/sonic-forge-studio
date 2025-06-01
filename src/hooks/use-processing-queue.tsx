@@ -1,40 +1,41 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { 
-  ProcessingJob, 
+  BrowserProcessingJob, 
   addToProcessingQueue,
   getProcessingQueue,
   getJobById,
   getRecentCompletedJobs,
-} from '@/services/redis';
+} from '@/services/browserQueue';
 import { toast } from '@/hooks/use-toast';
+import { errorHandler } from '@/services/errorHandler';
 
 export const useProcessingQueue = () => {
-  const [queuedJobs, setQueuedJobs] = useState<ProcessingJob[]>([]);
-  const [completedJobs, setCompletedJobs] = useState<ProcessingJob[]>([]);
+  const [queuedJobs, setQueuedJobs] = useState<BrowserProcessingJob[]>([]);
+  const [completedJobs, setCompletedJobs] = useState<BrowserProcessingJob[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Fetch all jobs in queue
   const fetchQueue = useCallback(async () => {
-    try {
+    const result = await errorHandler.withErrorHandling(async () => {
       setIsLoading(true);
       setError(null);
+      
       const jobs = await getProcessingQueue();
       setQueuedJobs(jobs);
       
       const recentCompleted = await getRecentCompletedJobs();
       setCompletedJobs(recentCompleted);
-    } catch (err) {
+      
+      return true;
+    }, 'Fetching processing queue');
+
+    if (!result) {
       setError('Failed to fetch processing queue');
-      toast({
-        title: "Error",
-        description: "Failed to fetch processing queue",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
     }
+    
+    setIsLoading(false);
   }, []);
 
   // Add a new job to the queue
@@ -47,10 +48,14 @@ export const useProcessingQueue = () => {
       noiseReduction: number;
       beatQuantization?: number;
       swingPreservation?: boolean;
+      preserveTempo?: boolean;
+      preserveTone?: boolean;
+      beatCorrectionMode?: string;
     }
   ) => {
-    try {
+    const result = await errorHandler.withErrorHandling(async () => {
       setIsLoading(true);
+      
       const jobData = {
         fileName: file.name,
         fileSize: file.size,
@@ -65,33 +70,22 @@ export const useProcessingQueue = () => {
       });
       
       // Refresh queue after adding
-      fetchQueue();
+      await fetchQueue();
       return jobId;
-    } catch (err) {
-      setError('Failed to add job to queue');
-      toast({
-        title: "Error",
-        description: "Failed to add job to processing queue",
-        variant: "destructive",
-      });
-      return null;
-    } finally {
-      setIsLoading(false);
-    }
+    }, 'Adding job to queue');
+
+    setIsLoading(false);
+    return result;
   }, [fetchQueue]);
 
   // Get a specific job
   const getJob = useCallback(async (jobId: string) => {
-    try {
+    return await errorHandler.withErrorHandling(async () => {
       setIsLoading(true);
       const job = await getJobById(jobId);
-      return job;
-    } catch (err) {
-      setError('Failed to get job details');
-      return null;
-    } finally {
       setIsLoading(false);
-    }
+      return job;
+    }, 'Getting job details');
   }, []);
 
   // Load queue on component mount
