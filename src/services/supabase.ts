@@ -28,10 +28,37 @@ export const isSupabaseConfigured = () => {
   return !!supabaseUrl && !!supabaseAnonKey && !!supabase;
 };
 
+// Helper function to check if the database schema is set up
+export const checkDatabaseSchema = async () => {
+  try {
+    if (!isSupabaseConfigured()) {
+      return { isSetup: false, error: 'Supabase not configured' };
+    }
+    
+    // Try to query the processing_jobs table
+    const { data, error } = await supabase
+      .from('processing_jobs')
+      .select('id')
+      .limit(1);
+      
+    if (error) {
+      return { isSetup: false, error: error.message };
+    }
+    
+    return { isSetup: true, error: null };
+  } catch (error) {
+    return { 
+      isSetup: false, 
+      error: error instanceof Error ? error.message : 'Unknown error' 
+    };
+  }
+};
+
 // Type for audio processing job
 export type ProcessingJob = {
   id?: string;
   created_at?: string;
+  updated_at?: string;
   user_id?: string;
   file_name: string;
   file_size: number;
