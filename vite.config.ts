@@ -34,4 +34,8 @@ export default defineConfig(({ mode }) => ({
       transformMixedEsModules: true,
     },
   },
+  // Add legacy peer deps handling to resolve version conflicts
+  optimizeDeps: {
+    force: true,
+  },
 }));
