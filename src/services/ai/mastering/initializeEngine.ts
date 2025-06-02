@@ -47,14 +47,15 @@ export async function initializeAIEngine(
     // Get preferred processing mode
     const processingMode = modelManager.getPreferredProcessingMode();
     
-    if (processingMode === ProcessingMode.REMOTE_API) {
+    // Check if we should use remote API processing
+    if (processingMode === ProcessingMode.REMOTE_API || !hasGPUSupport) {
       showRemoteAPIActiveNotification();
       // For remote API mode, we consider initialization successful
       return { 
         isInitialized: true, 
         hasGPUSupport, 
         isInitializing: false, 
-        processingMode 
+        processingMode: ProcessingMode.REMOTE_API 
       };
     }
     
@@ -72,13 +73,8 @@ export async function initializeAIEngine(
     console.log(`AI audio mastering engine initialization results:`, initStatus);
     console.log(`Using processing mode: ${processingMode}`);
     
-    if (anyInitialized || processingMode === ProcessingMode.REMOTE_API) {
-      if (processingMode !== ProcessingMode.REMOTE_API && anyInitialized) {
-        showInitSuccessNotification(hasGPUSupport);
-      } else {
-        showRemoteAPIActiveNotification();
-      }
-      
+    if (anyInitialized) {
+      showInitSuccessNotification(hasGPUSupport);
       return { 
         isInitialized: true, 
         hasGPUSupport, 
@@ -87,8 +83,10 @@ export async function initializeAIEngine(
       };
     } else {
       showPartialInitNotification();
+      // Fall back to remote API if local initialization failed
+      modelManager.setProcessingMode(ProcessingMode.REMOTE_API);
       return { 
-        isInitialized: false, 
+        isInitialized: true, 
         hasGPUSupport, 
         isInitializing: false, 
         processingMode: ProcessingMode.REMOTE_API 
@@ -97,8 +95,10 @@ export async function initializeAIEngine(
   } catch (error) {
     console.error("Failed to initialize AI audio engine:", error);
     showInitErrorNotification();
+    // Fall back to remote API on error
+    modelManager.setProcessingMode(ProcessingMode.REMOTE_API);
     return { 
-      isInitialized: false, 
+      isInitialized: true, 
       hasGPUSupport: false, 
       isInitializing: false, 
       processingMode: ProcessingMode.REMOTE_API 
