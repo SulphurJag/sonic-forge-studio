@@ -34,8 +34,6 @@ export async function initializeAIEngine(
     };
   }
   
-  let localIsInitializing = true;
-  
   try {
     // Check for WebGPU support first
     const hasGPUSupport = await modelManager.checkWebGPUSupport();
@@ -51,38 +49,51 @@ export async function initializeAIEngine(
     
     if (processingMode === ProcessingMode.REMOTE_API) {
       showRemoteAPIActiveNotification();
+      // For remote API mode, we consider initialization successful
+      return { 
+        isInitialized: true, 
+        hasGPUSupport, 
+        isInitializing: false, 
+        processingMode 
+      };
     }
     
     // Initialize all components in parallel with improved error handling
     const results = await Promise.allSettled([
-      noiseProcessor.initialize(),
-      contentClassifier.initialize(),
-      artifactEliminator.initialize()
+      noiseProcessor.initialize().catch(() => false),
+      contentClassifier.initialize().catch(() => false),
+      artifactEliminator.initialize().catch(() => false)
     ]);
     
-    // Check if any components failed to initialize
+    // Check if any components succeeded
     const initStatus = results.map(result => result.status === 'fulfilled' && result.value);
-    const isInitialized = initStatus.some(status => status === true);
+    const anyInitialized = initStatus.some(status => status === true);
     
     console.log(`AI audio mastering engine initialization results:`, initStatus);
     console.log(`Using processing mode: ${processingMode}`);
     
-    if (isInitialized) {
-      if (processingMode === ProcessingMode.LOCAL_WEBGPU) {
+    if (anyInitialized || processingMode === ProcessingMode.REMOTE_API) {
+      if (processingMode === ProcessingMode.LOCAL_WEBGPU && anyInitialized) {
         showInitSuccessNotification(hasGPUSupport);
       } else {
         showRemoteAPIActiveNotification();
       }
+      
+      return { 
+        isInitialized: true, 
+        hasGPUSupport, 
+        isInitializing: false, 
+        processingMode 
+      };
     } else {
       showPartialInitNotification();
+      return { 
+        isInitialized: false, 
+        hasGPUSupport, 
+        isInitializing: false, 
+        processingMode: ProcessingMode.REMOTE_API 
+      };
     }
-    
-    return { 
-      isInitialized, 
-      hasGPUSupport, 
-      isInitializing: false, 
-      processingMode 
-    };
   } catch (error) {
     console.error("Failed to initialize AI audio engine:", error);
     showInitErrorNotification();
@@ -92,8 +103,6 @@ export async function initializeAIEngine(
       isInitializing: false, 
       processingMode: ProcessingMode.REMOTE_API 
     };
-  } finally {
-    localIsInitializing = false;
   }
 }
 

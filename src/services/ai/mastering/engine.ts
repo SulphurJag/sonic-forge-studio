@@ -29,19 +29,31 @@ export class AIAudioMasteringEngine {
       return true;
     }
     
-    const result = await initializeAIEngine(
-      this.noiseProcessor,
-      this.contentClassifier,
-      this.artifactEliminator,
-      this.isInitializing
-    );
+    if (this.isInitializing) {
+      return false;
+    }
     
-    this.isInitialized = result.isInitialized;
-    this.hasGPUSupport = result.hasGPUSupport;
-    this.isInitializing = result.isInitializing;
-    this.processingMode = result.processingMode;
+    this.isInitializing = true;
     
-    return this.isInitialized;
+    try {
+      const result = await initializeAIEngine(
+        this.noiseProcessor,
+        this.contentClassifier,
+        this.artifactEliminator,
+        this.isInitializing
+      );
+      
+      this.isInitialized = result.isInitialized;
+      this.hasGPUSupport = result.hasGPUSupport;
+      this.processingMode = result.processingMode;
+      
+      return this.isInitialized;
+    } catch (error) {
+      console.error('AI engine initialization failed:', error);
+      return false;
+    } finally {
+      this.isInitializing = false;
+    }
   }
   
   // Check if the engine is ready for processing
@@ -77,6 +89,19 @@ export class AIAudioMasteringEngine {
     audioBuffer: AudioBuffer,
     settings: AIAudioProcessingSettings
   ): Promise<AIAudioProcessingResult> {
+    if (!this.isInitialized) {
+      console.log('AI engine not initialized, attempting to initialize...');
+      const initialized = await this.initialize();
+      if (!initialized) {
+        console.warn('AI engine initialization failed, returning original buffer');
+        return {
+          processedBuffer: audioBuffer,
+          contentType: [],
+          artifactsFound: false
+        };
+      }
+    }
+    
     return processAudioWithAI(
       audioBuffer,
       settings,
@@ -86,5 +111,12 @@ export class AIAudioMasteringEngine {
       this.isInitialized,
       () => this.initialize()
     );
+  }
+  
+  // Dispose of resources
+  dispose(): void {
+    this.isInitialized = false;
+    this.isInitializing = false;
+    // Clean up any resources if needed
   }
 }
