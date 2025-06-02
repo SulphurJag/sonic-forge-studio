@@ -1,4 +1,3 @@
-
 import { useCallback, useEffect, useState } from 'react';
 import { 
   BrowserProcessingJob, 
@@ -6,7 +5,7 @@ import {
   getProcessingQueue,
   getJobById,
   getRecentCompletedJobs,
-} from '@/services/browserQueue';
+} from '@/services/queue/api';
 import { toast } from '@/hooks/use-toast';
 import { errorHandler } from '@/services/errorHandler';
 
