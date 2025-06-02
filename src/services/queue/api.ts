@@ -2,6 +2,9 @@
 import { BrowserProcessingJob } from './types';
 import { BrowserQueueManager } from './manager';
 
+// Re-export types for convenience
+export type { BrowserProcessingJob } from './types';
+
 // Export the queue manager instance
 export const browserQueue = BrowserQueueManager.getInstance();
 
