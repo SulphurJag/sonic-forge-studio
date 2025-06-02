@@ -73,7 +73,7 @@ export async function initializeAIEngine(
     console.log(`Using processing mode: ${processingMode}`);
     
     if (anyInitialized || processingMode === ProcessingMode.REMOTE_API) {
-      if (processingMode === ProcessingMode.LOCAL_WEBGPU && anyInitialized) {
+      if (processingMode !== ProcessingMode.REMOTE_API && anyInitialized) {
         showInitSuccessNotification(hasGPUSupport);
       } else {
         showRemoteAPIActiveNotification();

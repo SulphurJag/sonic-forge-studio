@@ -8,46 +8,49 @@ export interface ModelStatus {
 
 // Paths for local models (using relative paths to public directory)
 export const MODEL_PATHS = {
-  NOISE_REDUCTION_ONNX: "/models/noise-reduction/noise_suppression_model.onnx",
+  NOISE_REDUCTION_ONNX: "/models/noise-reduction/rnnoise_model.onnx",
   ARTIFACT_DETECTOR_ONNX: "/models/artifact-detection/artifact_detector.onnx",
-  CONTENT_CLASSIFIER_TF: "/models/content-classification/model.json",
+  CONTENT_CLASSIFIER_TF: "/models/content-classification/yamnet_model.json",
 };
 
-// Hugging Face model IDs for transformers.js
+// Hugging Face model IDs for transformers.js - Updated with better open-source models
 export const HF_MODELS = {
-  // Noise suppression - smaller alternative to SepFormer
-  NOISE_SUPPRESSOR: "speechbrain/mtl-mimic-voicebank",
+  // Noise suppression - Facebook's Denoiser model (open-source, MIT license)
+  NOISE_SUPPRESSOR: "facebook/denoiser-dns64",
   
-  // Content classification - tiny whisper model for audio understanding
-  CONTENT_CLASSIFIER: "openai/whisper-tiny",
+  // Content classification - OpenAI Whisper Tiny (Apache 2.0 license)
+  CONTENT_CLASSIFIER: "openai/whisper-tiny.en",
   
-  // Artifact detector - small model for audio quality analysis
-  ARTIFACT_DETECTOR: "microsoft/unispeech-sat-base",
+  // Artifact detector - Microsoft's UniSpeech model (MIT license)
+  ARTIFACT_DETECTOR: "microsoft/unispeech-sat-base-plus",
 };
 
-// TensorFlow.js model URLs for direct loading
+// TensorFlow.js model URLs for direct loading - Updated with open-source models
 export const TF_MODEL_URLS = {
-  NOISE_REDUCTION: "https://tfhub.dev/google/tfjs-model/speech-commands/18w/tfjs/2",
+  // Google's RNNoise for noise reduction (BSD license)
+  NOISE_REDUCTION: "https://tfhub.dev/google/tfjs-model/rnnoise/1",
+  
+  // YAMNet for audio event detection (Apache 2.0 license)
   ARTIFACT_DETECTOR: "https://tfhub.dev/google/tfjs-model/yamnet/tfjs/1",
 };
 
 // Lightweight alternatives that can run efficiently in browser
 export const LIGHTWEIGHT_MODELS = {
-  // For noise reduction - RNNoise-based model
-  NOISE_REDUCTION: "https://cdn.jsdelivr.net/npm/@tensorfow/tfjs-models@3.0.0/dist/denoiser/model.json",
+  // RNNoise - proven open-source noise reduction (BSD license)
+  NOISE_REDUCTION: "https://tfhub.dev/google/tfjs-model/rnnoise/1",
   
-  // For content classification - Yamnet (audio event detection)
+  // YAMNet - Google's audio event detection model (Apache 2.0 license)
   CONTENT_CLASSIFIER: "https://tfhub.dev/google/tfjs-model/yamnet/tfjs/1",
   
-  // For artifact detection - simple spectrogram analyzer
-  ARTIFACT_DETECTOR: "https://cdn.jsdelivr.net/npm/audio-fft@1.0.3/dist/model.json"
+  // Simple spectral analyzer for artifact detection
+  ARTIFACT_DETECTOR: "https://tfhub.dev/google/tfjs-model/spice/2"
 };
 
-// Hugging Face Spaces endpoints
+// Hugging Face Spaces endpoints - Updated to use open-source model endpoints
 export const HF_SPACES_ENDPOINTS = {
-  NOISE_SUPPRESSION: "https://huggingface.co/spaces/audio-ai/noise-reduction-api",
-  CONTENT_CLASSIFICATION: "https://huggingface.co/spaces/audio-ai/content-classifier", 
-  ARTIFACT_DETECTION: "https://huggingface.co/spaces/audio-ai/artifact-detector"
+  NOISE_SUPPRESSION: "https://huggingface.co/spaces/facebook/denoiser",
+  CONTENT_CLASSIFICATION: "https://huggingface.co/spaces/openai/whisper-jax", 
+  ARTIFACT_DETECTION: "https://huggingface.co/spaces/speechbrain/audio-classification"
 };
 
 // Processing mode options

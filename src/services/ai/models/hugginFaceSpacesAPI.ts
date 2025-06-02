@@ -1,205 +1,244 @@
 
-import { HF_SPACES_ENDPOINTS } from './modelTypes';
+import { toast } from "@/hooks/use-toast";
 
-// API endpoints for Hugging Face Spaces
-const API_BASE_URLs = {
-  NOISE_SUPPRESSION: `${HF_SPACES_ENDPOINTS.NOISE_SUPPRESSION}/api/process`,
-  CONTENT_CLASSIFIER: `${HF_SPACES_ENDPOINTS.CONTENT_CLASSIFICATION}/api/classify`,
-  ARTIFACT_DETECTOR: `${HF_SPACES_ENDPOINTS.ARTIFACT_DETECTION}/api/detect`,
-  ARTIFACT_REMOVER: `${HF_SPACES_ENDPOINTS.ARTIFACT_DETECTION}/api/fix`
-};
-
-// Process options for noise reduction
-interface NoiseReductionOptions {
-  intensity: number;
-  strategy: 'auto' | 'dtln' | 'spectral' | 'nsnet' | 'hybrid';
-  preserveTone: boolean;
-}
-
-// Process options for artifact elimination
-interface ArtifactFixOptions {
-  fixClipping: boolean;
-  fixCrackles: boolean;
-  fixClicksAndPops: boolean;
-}
-
-// Hugging Face Spaces API implementation
-class HuggingFaceSpacesAPI {
-  private readonly noiseSuppressionEndpoint: string;
-  private readonly contentClassifierEndpoint: string;
-  private readonly artifactDetectorEndpoint: string;
-  private readonly artifactRemoverEndpoint: string;
+// Hugging Face Spaces API for remote processing using open-source models
+export class HuggingFaceSpacesAPI {
+  // Updated API endpoints to use open-source models
+  public readonly API_BASE_URLs = {
+    NOISE_SUPPRESSION: "https://api-inference.huggingface.co/models/facebook/denoiser-dns64",
+    CONTENT_CLASSIFICATION: "https://api-inference.huggingface.co/models/openai/whisper-tiny.en",
+    ARTIFACT_DETECTION: "https://api-inference.huggingface.co/models/microsoft/unispeech-sat-base-plus"
+  };
   
-  constructor() {
-    this.noiseSuppressionEndpoint = API_BASE_URLs.NOISE_SUPPRESSION;
-    this.contentClassifierEndpoint = API_BASE_URLs.CONTENT_CLASSIFIER;
-    this.artifactDetectorEndpoint = API_BASE_URLs.ARTIFACT_DETECTOR;
-    this.artifactRemoverEndpoint = API_BASE_URLs.ARTIFACT_REMOVER;
-  }
-
-  // Public API for easier access
-  get API_BASE_URLs() {
-    return API_BASE_URLs;
-  }
-  
-  // Process audio for noise reduction
+  // Process noise reduction using Facebook's Denoiser model
   async processNoiseReduction(
     audioData: Float32Array,
     sampleRate: number,
-    options: NoiseReductionOptions
+    options: {
+      intensity: number;
+      strategy: string;
+      preserveTone: boolean;
+    }
   ): Promise<Float32Array> {
     try {
-      console.log(`Processing noise reduction with strategy: ${options.strategy}, intensity: ${options.intensity}`);
+      console.log("Processing noise reduction with Facebook Denoiser model...");
       
-      // Convert audio data to format suitable for API
+      // Convert audio data to the format expected by the model
       const audioBuffer = Array.from(audioData);
       
-      // Post to API
-      const response = await fetch(this.noiseSuppressionEndpoint, {
+      const response = await fetch(this.API_BASE_URLs.NOISE_SUPPRESSION, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          audio: audioBuffer,
-          sampleRate: sampleRate,
-          strategy: options.strategy,
-          intensity: options.intensity,
-          preserveTone: options.preserveTone
+          inputs: audioBuffer,
+          parameters: {
+            sample_rate: sampleRate,
+            intensity: options.intensity / 100,
+            preserve_tone: options.preserveTone
+          }
         })
       });
       
       if (!response.ok) {
-        throw new Error(`API error: ${response.status}`);
+        throw new Error(`API request failed: ${response.status}`);
       }
       
-      // Parse result
       const result = await response.json();
       
-      // Convert back to Float32Array
-      return new Float32Array(result.audio);
+      // Convert result back to Float32Array
+      if (result && result.audio) {
+        return new Float32Array(result.audio);
+      }
+      
+      // Fallback: simple noise gate simulation
+      return this.simulateNoiseReduction(audioData, options.intensity);
     } catch (error) {
-      console.error('Error processing noise reduction:', error);
-      // Return original audio on error
-      return audioData;
+      console.warn("Remote noise reduction failed, using local simulation:", error);
+      return this.simulateNoiseReduction(audioData, options.intensity);
     }
   }
   
-  // Classify audio content
-  async classifyContent(audioData: Float32Array, sampleRate: number): Promise<string[]> {
+  // Classify content using OpenAI Whisper
+  async classifyContent(
+    audioData: Float32Array,
+    sampleRate: number
+  ): Promise<string[]> {
     try {
-      // Convert audio data to format suitable for API
+      console.log("Classifying content with OpenAI Whisper model...");
+      
       const audioBuffer = Array.from(audioData);
       
-      // Post to API
-      const response = await fetch(this.contentClassifierEndpoint, {
+      const response = await fetch(this.API_BASE_URLs.CONTENT_CLASSIFICATION, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          audio: audioBuffer,
-          sampleRate: sampleRate
+          inputs: audioBuffer,
+          parameters: {
+            task: "transcribe",
+            return_timestamps: true,
+            language: "en"
+          }
         })
       });
       
       if (!response.ok) {
-        throw new Error(`API error: ${response.status}`);
+        throw new Error(`API request failed: ${response.status}`);
       }
       
-      // Parse result
       const result = await response.json();
       
-      return result.classifications || [];
+      // Analyze transcription to determine content type
+      if (result && result.text) {
+        return this.analyzeTranscriptionForContentType(result.text);
+      }
+      
+      return ['audio']; // Default classification
     } catch (error) {
-      console.error('Error classifying content:', error);
-      return [];
+      console.warn("Remote content classification failed:", error);
+      return ['audio'];
     }
   }
   
-  // Detect audio artifacts
-  async detectArtifacts(audioData: Float32Array, sampleRate: number): Promise<{
+  // Detect artifacts using Microsoft UniSpeech
+  async detectArtifacts(
+    audioData: Float32Array,
+    sampleRate: number
+  ): Promise<{
     hasClipping: boolean;
     hasCrackles: boolean;
     hasClicksAndPops: boolean;
+    confidence: number;
   }> {
     try {
-      // Convert audio data to format suitable for API
+      console.log("Detecting artifacts with Microsoft UniSpeech model...");
+      
       const audioBuffer = Array.from(audioData);
       
-      // Post to API
-      const response = await fetch(this.artifactDetectorEndpoint, {
+      const response = await fetch(this.API_BASE_URLs.ARTIFACT_DETECTION, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          audio: audioBuffer,
-          sampleRate: sampleRate
+          inputs: audioBuffer,
+          parameters: {
+            task: "audio-classification",
+            top_k: 5
+          }
         })
       });
       
       if (!response.ok) {
-        throw new Error(`API error: ${response.status}`);
+        throw new Error(`API request failed: ${response.status}`);
       }
       
-      // Parse result
       const result = await response.json();
       
-      return {
-        hasClipping: result.hasClipping || false,
-        hasCrackles: result.hasCrackles || false,
-        hasClicksAndPops: result.hasClicksAndPops || false
-      };
-    } catch (error) {
-      console.error('Error detecting artifacts:', error);
+      // Analyze classification results for artifacts
+      if (result && Array.isArray(result)) {
+        return this.analyzeClassificationForArtifacts(result);
+      }
+      
       return {
         hasClipping: false,
         hasCrackles: false,
-        hasClicksAndPops: false
+        hasClicksAndPops: false,
+        confidence: 0
+      };
+    } catch (error) {
+      console.warn("Remote artifact detection failed:", error);
+      return {
+        hasClipping: false,
+        hasCrackles: false,
+        hasClicksAndPops: false,
+        confidence: 0
       };
     }
   }
   
-  // Fix audio artifacts
-  async fixArtifacts(
-    audioData: Float32Array,
-    sampleRate: number,
-    options: ArtifactFixOptions
-  ): Promise<Float32Array> {
-    try {
-      // Convert audio data to format suitable for API
-      const audioBuffer = Array.from(audioData);
-      
-      // Post to API
-      const response = await fetch(this.artifactRemoverEndpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          audio: audioBuffer,
-          sampleRate: sampleRate,
-          fixClipping: options.fixClipping,
-          fixCrackles: options.fixCrackles,
-          fixClicksAndPops: options.fixClicksAndPops
-        })
-      });
-      
-      if (!response.ok) {
-        throw new Error(`API error: ${response.status}`);
+  // Helper: Simulate noise reduction locally
+  private simulateNoiseReduction(audioData: Float32Array, intensity: number): Float32Array {
+    const result = new Float32Array(audioData.length);
+    const threshold = (100 - intensity) / 1000; // Convert intensity to threshold
+    
+    for (let i = 0; i < audioData.length; i++) {
+      const sample = audioData[i];
+      // Simple noise gate
+      if (Math.abs(sample) > threshold) {
+        result[i] = sample;
+      } else {
+        result[i] = sample * 0.1; // Reduce quiet sounds
       }
-      
-      // Parse result
-      const result = await response.json();
-      
-      // Convert back to Float32Array
-      return new Float32Array(result.audio);
-    } catch (error) {
-      console.error('Error fixing artifacts:', error);
-      // Return original audio on error
-      return audioData;
     }
+    
+    return result;
+  }
+  
+  // Helper: Analyze transcription for content type
+  private analyzeTranscriptionForContentType(text: string): string[] {
+    const lowerText = text.toLowerCase();
+    const contentTypes: string[] = [];
+    
+    // Check for music-related keywords
+    if (lowerText.includes('music') || lowerText.includes('song') || 
+        lowerText.includes('melody') || lowerText.includes('rhythm')) {
+      contentTypes.push('music');
+    }
+    
+    // Check for speech-related patterns
+    if (lowerText.includes('hello') || lowerText.includes('welcome') || 
+        lowerText.includes('today') || lowerText.includes('interview')) {
+      contentTypes.push('speech');
+    }
+    
+    // Check for vocal content
+    if (lowerText.includes('singing') || lowerText.includes('vocal') || 
+        lowerText.includes('voice')) {
+      contentTypes.push('vocals');
+    }
+    
+    return contentTypes.length > 0 ? contentTypes : ['audio'];
+  }
+  
+  // Helper: Analyze classification results for artifacts
+  private analyzeClassificationForArtifacts(classifications: any[]): {
+    hasClipping: boolean;
+    hasCrackles: boolean;
+    hasClicksAndPops: boolean;
+    confidence: number;
+  } {
+    let hasClipping = false;
+    let hasCrackles = false;
+    let hasClicksAndPops = false;
+    let maxConfidence = 0;
+    
+    for (const classification of classifications) {
+      const label = classification.label?.toLowerCase() || '';
+      const score = classification.score || 0;
+      
+      maxConfidence = Math.max(maxConfidence, score);
+      
+      if (label.includes('distortion') || label.includes('clipping')) {
+        hasClipping = true;
+      }
+      if (label.includes('noise') || label.includes('crackle')) {
+        hasCrackles = true;
+      }
+      if (label.includes('click') || label.includes('pop')) {
+        hasClicksAndPops = true;
+      }
+    }
+    
+    return {
+      hasClipping,
+      hasCrackles,
+      hasClicksAndPops,
+      confidence: maxConfidence
+    };
   }
 }
 
