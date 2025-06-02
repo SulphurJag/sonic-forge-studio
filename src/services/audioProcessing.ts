@@ -1,30 +1,8 @@
-import { toast } from "@/hooks/use-toast";
-import { aiAudioProcessor } from "./aiAudioProcessing";
 
-// Audio processing configuration types
-export interface ProcessingSettings {
-  mode: string;
-  targetLufs: number;
-  dryWet: number;
-  noiseReduction: number;
-  beatQuantization?: number;
-  swingPreservation?: boolean;
-  preserveTempo: boolean;
-  preserveTone: boolean;
-  beatCorrectionMode?: string;
-  beatAnalysisIntensity?: number;
-  transientPreservation?: boolean;
-  phaseAlignment?: boolean;
-  // AI processing settings
-  enableAI?: boolean;
-  aiNoiseReduction?: boolean;
-  noiseReductionStrategy?: 'auto' | 'dtln' | 'spectral' | 'nsnet' | 'hybrid';
-  noiseReductionIntensity?: number;
-  contentClassification?: boolean;
-  autoProcessing?: boolean;
-  artifactElimination?: boolean;
-}
+import { AIAudioMasteringEngine } from './ai/aiAudioMasteringEngine';
+import { AIAudioProcessingSettings } from './ai/mastering/types';
 
+// Processing results interface
 export interface ProcessingResults {
   inputLufs: number;
   outputLufs: number;
@@ -32,1011 +10,261 @@ export interface ProcessingResults {
   outputPeak: number;
   noiseReduction: number;
   contentType?: string[];
-  artifactsEliminated?: boolean;
+  artifactsFound?: boolean;
 }
 
-// Use BaseAudioContext as the common type for both AudioContext and OfflineAudioContext
-type AudioContextType = BaseAudioContext;
-
-// Class to handle EBU R128 loudness measurement
-class LoudnessAnalyzer {
-  private audioContext: AudioContextType;
-  private analyserNode: AnalyserNode;
-  private gainNode: GainNode;
-
-  constructor(audioContext: AudioContextType) {
-    this.audioContext = audioContext;
-    this.analyserNode = audioContext.createAnalyser();
-    this.gainNode = audioContext.createGain();
-    
-    // Configure analyser
-    this.analyserNode.fftSize = 2048;
-    this.analyserNode.smoothingTimeConstant = 0.8;
-    
-    // Connect nodes
-    this.gainNode.connect(this.analyserNode);
-  }
-
-  // Connect to audio source
-  connectSource(source: AudioNode): void {
-    source.connect(this.gainNode);
-  }
-  
-  // Get output node to connect to destination
-  getOutputNode(): AudioNode {
-    return this.analyserNode;
-  }
-  
-  // Measure LUFS (simplified implementation)
-  measureLUFS(): number {
-    // Get frequency data
-    const bufferLength = this.analyserNode.frequencyBinCount;
-    const dataArray = new Uint8Array(bufferLength);
-    this.analyserNode.getByteFrequencyData(dataArray);
-    
-    // Calculate RMS value (root mean square)
-    let sum = 0;
-    for (let i = 0; i < bufferLength; i++) {
-      sum += (dataArray[i] / 255) ** 2;
-    }
-    const rms = Math.sqrt(sum / bufferLength);
-    
-    // Convert RMS to approximate LUFS (simplified)
-    // Real EBU R128 implementation would be more complex
-    const lufs = -23 - (1 - rms) * 30;
-    return Math.min(0, Math.max(-70, lufs));
-  }
-  
-  // Measure peak level
-  measurePeak(): number {
-    const bufferLength = this.analyserNode.frequencyBinCount;
-    const dataArray = new Uint8Array(bufferLength);
-    this.analyserNode.getByteTimeDomainData(dataArray);
-    
-    let max = 0;
-    for (let i = 0; i < bufferLength; i++) {
-      const amplitude = Math.abs(dataArray[i] / 128 - 1);
-      max = Math.max(max, amplitude);
-    }
-    
-    // Convert to dB
-    const dbFS = 20 * Math.log10(max);
-    return Math.min(0, dbFS);
-  }
+// Audio processing settings interface
+export interface AudioProcessingSettings {
+  mode: string;
+  targetLufs: number;
+  dryWet: number;
+  noiseReduction: number;
+  beatQuantization?: number;
+  swingPreservation?: boolean;
+  preserveTempo?: boolean;
+  preserveTone?: boolean;
+  beatCorrectionMode?: string;
 }
 
-// Noise suppression processor
-class NoiseSuppressionProcessor {
-  private audioContext: AudioContextType;
-  private inputNode: GainNode;
-  private outputNode: GainNode;
-  private filterNode: BiquadFilterNode;
-  private dynamicsNode: DynamicsCompressorNode;
-  private amount: number;
-  private preserveTone: boolean;
+// Main audio processing service
+class AudioProcessor {
+  private audioContext: AudioContext | null = null;
+  private currentAudioBuffer: AudioBuffer | null = null;
+  private aiEngine: AIAudioMasteringEngine;
+  private isInitialized: boolean = false;
   
-  constructor(audioContext: AudioContextType, amount: number = 0.5, preserveTone: boolean = true) {
-    this.audioContext = audioContext;
-    this.amount = amount;
-    this.preserveTone = preserveTone;
-    
-    // Create nodes
-    this.inputNode = audioContext.createGain();
-    this.outputNode = audioContext.createGain();
-    this.filterNode = audioContext.createBiquadFilter();
-    this.dynamicsNode = audioContext.createDynamicsCompressor();
-    
-    this.configureNodes();
-    
-    // Connect nodes
-    this.inputNode.connect(this.filterNode);
-    this.filterNode.connect(this.dynamicsNode);
-    this.dynamicsNode.connect(this.outputNode);
+  constructor() {
+    this.aiEngine = new AIAudioMasteringEngine();
   }
   
-  private configureNodes() {
-    // Configure filter (high pass to remove low frequency noise)
-    this.filterNode.type = "highpass";
+  // Initialize the audio processor
+  async initialize(): Promise<void> {
+    if (this.isInitialized) return;
     
-    if (this.preserveTone) {
-      // Gentler settings when preserving tone
-      this.filterNode.frequency.value = 80 * this.amount; // Lower cutoff frequency
-      
-      // Configure dynamics compressor (for reducing noise floor)
-      this.dynamicsNode.threshold.value = -60 + (30 * (1 - this.amount));
-      this.dynamicsNode.ratio.value = Math.min(6, 4 + (this.amount * 4)); // Lower ratio
-      this.dynamicsNode.attack.value = 0.01; // Slower attack
-      this.dynamicsNode.release.value = 0.3; // Slower release
-    } else {
-      // Original stronger settings
-      this.filterNode.frequency.value = 100 * this.amount;
-      
-      // Configure dynamics compressor (for reducing noise floor)
-      this.dynamicsNode.threshold.value = -50 + (20 * (1 - this.amount));
-      this.dynamicsNode.ratio.value = 12;
-      this.dynamicsNode.attack.value = 0.003;
-      this.dynamicsNode.release.value = 0.25;
-    }
-  }
-  
-  // Set the amount of noise reduction (0-1)
-  setAmount(amount: number, preserveTone: boolean = true): void {
-    this.amount = Math.max(0, Math.min(1, amount));
-    this.preserveTone = preserveTone;
-    this.configureNodes();
-  }
-  
-  // Connect to audio source
-  connectSource(source: AudioNode): void {
-    source.connect(this.inputNode);
-  }
-  
-  // Get output node to connect to destination
-  getOutputNode(): AudioNode {
-    return this.outputNode;
-  }
-  
-  // Estimate noise reduction in dB
-  estimateNoiseReduction(): number {
-    // Simplified estimation based on settings
-    // Real implementation would analyze before/after spectra
-    return this.preserveTone ? this.amount * 6 : this.amount * 10; // up to 6 or 10 dB of reduction
-  }
-}
-
-// Content-aware processing engine
-class ContentAwareProcessor {
-  private audioContext: AudioContextType;
-  private inputNode: GainNode;
-  private outputNode: GainNode;
-  private eqLow: BiquadFilterNode;
-  private eqMid: BiquadFilterNode;
-  private eqHigh: BiquadFilterNode;
-  private compressor: DynamicsCompressorNode;
-  private mode: string;
-  private preserveTone: boolean;
-  
-  constructor(audioContext: AudioContextType, mode: string = "music", preserveTone: boolean = true) {
-    this.audioContext = audioContext;
-    this.mode = mode;
-    this.preserveTone = preserveTone;
-    
-    // Create nodes
-    this.inputNode = audioContext.createGain();
-    this.outputNode = audioContext.createGain();
-    
-    // Multi-band processing
-    this.eqLow = audioContext.createBiquadFilter();
-    this.eqMid = audioContext.createBiquadFilter();
-    this.eqHigh = audioContext.createBiquadFilter();
-    this.compressor = audioContext.createDynamicsCompressor();
-    
-    this.configureForMode(mode);
-    
-    // Connect nodes
-    this.inputNode.connect(this.eqLow);
-    this.inputNode.connect(this.eqMid);
-    this.inputNode.connect(this.eqHigh);
-    this.eqLow.connect(this.compressor);
-    this.eqMid.connect(this.compressor);
-    this.eqHigh.connect(this.compressor);
-    this.compressor.connect(this.outputNode);
-  }
-  
-  // Configure processing based on content type
-  configureForMode(mode: string): void {
-    this.mode = mode;
-    
-    // Configure EQ bands
-    this.eqLow.type = "lowshelf";
-    this.eqMid.type = "peaking";
-    this.eqHigh.type = "highshelf";
-    
-    // If preserving tone, use much gentler settings
-    const tonePreservationFactor = this.preserveTone ? 0.3 : 1.0;
-    
-    switch (mode) {
-      case "podcast":
-        // Enhance vocals, reduce boominess
-        this.eqLow.frequency.value = 200;
-        this.eqLow.gain.value = -2 * tonePreservationFactor;
-        this.eqMid.frequency.value = 2500;
-        this.eqMid.Q.value = 1;
-        this.eqMid.gain.value = 3 * tonePreservationFactor;
-        this.eqHigh.frequency.value = 8000;
-        this.eqHigh.gain.value = 1 * tonePreservationFactor;
-        // Compression for voice
-        this.compressor.threshold.value = -20;
-        this.compressor.ratio.value = 2 + (2 * tonePreservationFactor); // 2-4
-        this.compressor.attack.value = this.preserveTone ? 0.01 : 0.003;
-        this.compressor.release.value = this.preserveTone ? 0.35 : 0.25;
-        break;
-        
-      case "vocal":
-        // Enhance vocals for music
-        this.eqLow.frequency.value = 100;
-        this.eqLow.gain.value = -1 * tonePreservationFactor;
-        this.eqMid.frequency.value = 3000;
-        this.eqMid.Q.value = 1.5;
-        this.eqMid.gain.value = 2 * tonePreservationFactor;
-        this.eqHigh.frequency.value = 10000;
-        this.eqHigh.gain.value = 1.5 * tonePreservationFactor;
-        // Moderate compression for vocals
-        this.compressor.threshold.value = -24;
-        this.compressor.ratio.value = 1.5 + (1.5 * tonePreservationFactor); // 1.5-3
-        this.compressor.attack.value = this.preserveTone ? 0.005 : 0.001;
-        this.compressor.release.value = this.preserveTone ? 0.3 : 0.2;
-        break;
-        
-      case "instrumental":
-        // Enhance instruments
-        this.eqLow.frequency.value = 100;
-        this.eqLow.gain.value = 1 * tonePreservationFactor;
-        this.eqMid.frequency.value = 1000;
-        this.eqMid.Q.value = 1;
-        this.eqMid.gain.value = 0;
-        this.eqHigh.frequency.value = 8000;
-        this.eqHigh.gain.value = 2 * tonePreservationFactor;
-        // Light compression for instruments
-        this.compressor.threshold.value = -18;
-        this.compressor.ratio.value = 1.5 + (1 * tonePreservationFactor); // 1.5-2.5
-        this.compressor.attack.value = this.preserveTone ? 0.01 : 0.005;
-        this.compressor.release.value = this.preserveTone ? 0.25 : 0.15;
-        break;
-        
-      case "music":
-      default:
-        // Balanced music master
-        this.eqLow.frequency.value = 120;
-        this.eqLow.gain.value = 1.5 * tonePreservationFactor;
-        this.eqMid.frequency.value = 1500;
-        this.eqMid.Q.value = 0.8;
-        this.eqMid.gain.value = 0;
-        this.eqHigh.frequency.value = 8000;
-        this.eqHigh.gain.value = 1.5 * tonePreservationFactor;
-        // Standard music compression
-        this.compressor.threshold.value = -24;
-        this.compressor.ratio.value = 1.3 + (0.7 * tonePreservationFactor); // 1.3-2
-        this.compressor.attack.value = this.preserveTone ? 0.01 : 0.003;
-        this.compressor.release.value = this.preserveTone ? 0.2 : 0.1;
-        break;
-    }
-  }
-  
-  // Set preserve tone option
-  setPreserveTone(preserve: boolean): void {
-    this.preserveTone = preserve;
-    this.configureForMode(this.mode);
-  }
-  
-  // Connect to audio source
-  connectSource(source: AudioNode): void {
-    source.connect(this.inputNode);
-  }
-  
-  // Get output node to connect to destination
-  getOutputNode(): AudioNode {
-    return this.outputNode;
-  }
-}
-
-// Phase coherence processor
-class PhaseCoherenceProcessor {
-  private audioContext: AudioContextType;
-  private inputNode: GainNode;
-  private outputNode: GainNode;
-  private stereoEnhancer: StereoPannerNode;
-  private midSideProcessor: ChannelSplitterNode;
-  private phaseAlignmentEnabled: boolean;
-  
-  constructor(audioContext: AudioContextType, phaseAlignmentEnabled: boolean = true) {
-    this.audioContext = audioContext;
-    this.phaseAlignmentEnabled = phaseAlignmentEnabled;
-    
-    // Create nodes
-    this.inputNode = audioContext.createGain();
-    this.outputNode = audioContext.createGain();
-    this.stereoEnhancer = audioContext.createStereoPanner();
-    this.midSideProcessor = audioContext.createChannelSplitter(2);
-    
-    // Connect nodes in a basic stereo enhancement setup
-    this.configureNodes();
-  }
-  
-  private configureNodes() {
-    // If phase alignment is disabled, use a simpler chain
-    if (!this.phaseAlignmentEnabled) {
-      this.inputNode.connect(this.outputNode);
-      return;
-    }
-    
-    // Connect nodes for phase-coherent processing
-    this.inputNode.connect(this.midSideProcessor);
-    this.midSideProcessor.connect(this.stereoEnhancer);
-    this.stereoEnhancer.connect(this.outputNode);
-  }
-  
-  // Set phase alignment setting
-  setPhaseAlignment(enabled: boolean): void {
-    if (this.phaseAlignmentEnabled !== enabled) {
-      this.phaseAlignmentEnabled = enabled;
-      // Disconnect existing connections
-      this.inputNode.disconnect();
-      // Reconfigure nodes with new setting
-      this.configureNodes();
-    }
-  }
-  
-  // Connect to audio source
-  connectSource(source: AudioNode): void {
-    source.connect(this.inputNode);
-  }
-  
-  // Get output node to connect to destination
-  getOutputNode(): AudioNode {
-    return this.outputNode;
-  }
-}
-
-// Rhythmic enhancement processor
-class RhythmicProcessor {
-  private audioContext: AudioContextType;
-  private inputNode: GainNode;
-  private outputNode: GainNode;
-  private compressor: DynamicsCompressorNode;
-  private enhancer: BiquadFilterNode;
-  private transientShaper: WaveShaperNode; // For transient preservation
-  private beatQuantizationAmount: number = 0;
-  private preserveSwing: boolean = true;
-  private preserveTempo: boolean = true;
-  private preserveTransients: boolean = true;
-  private correctionMode: string = "gentle";
-  private beatAnalysisIntensity: number = 75;
-  
-  constructor(
-    audioContext: AudioContextType, 
-    preserveTempo: boolean = true,
-    preserveTransients: boolean = true
-  ) {
-    this.audioContext = audioContext;
-    this.preserveTempo = preserveTempo;
-    this.preserveTransients = preserveTransients;
-    
-    // Create nodes
-    this.inputNode = audioContext.createGain();
-    this.outputNode = audioContext.createGain();
-    this.compressor = audioContext.createDynamicsCompressor();
-    this.enhancer = audioContext.createBiquadFilter();
-    this.transientShaper = audioContext.createWaveShaper();
-    
-    // Configure enhancer for transient enhancement
-    this.enhancer.type = "peaking";
-    this.enhancer.frequency.value = 1200;
-    this.enhancer.Q.value = 1.0;
-    this.enhancer.gain.value = 0;
-    
-    // Configure compressor for transient shaping
-    this.compressor.threshold.value = -24;
-    this.compressor.ratio.value = 4;
-    this.compressor.attack.value = 0.001; 
-    this.compressor.release.value = 0.1;
-    
-    // Configure transient shaper (waveshaper with custom curve for transient preservation)
-    this.configureTransientShaper();
-    
-    // Connect nodes
-    this.connectNodes();
-  }
-  
-  // Configure the transient shaper with a custom curve
-  private configureTransientShaper(): void {
-    // Create a custom curve that enhances transients
-    const curve = new Float32Array(65536);
-    const k = this.preserveTransients ? 5.0 : 2.0; // Higher k means stronger transient preservation
-    
-    for (let i = 0; i < 65536; i++) {
-      const x = i * 2 / 65536 - 1;
-      // Apply a modified sigmoid function that enhances small values (transients)
-      curve[i] = (3 + k) * x * 0.3 / (3 + k * Math.abs(x));
-    }
-    
-    this.transientShaper.curve = curve;
-    this.transientShaper.oversample = "4x"; // Use oversampling for higher quality
-  }
-  
-  // Connect nodes based on current settings
-  private connectNodes(): void {
-    // Disconnect any existing connections
-    this.inputNode.disconnect();
-    
-    if (this.preserveTransients) {
-      // Transient preservation chain
-      this.inputNode.connect(this.transientShaper);
-      this.transientShaper.connect(this.enhancer);
-    } else {
-      // Direct connection without transient shaping
-      this.inputNode.connect(this.enhancer);
-    }
-    
-    this.enhancer.connect(this.compressor);
-    this.compressor.connect(this.outputNode);
-  }
-  
-  // Set beat quantization and correction parameters
-  setBeatQuantization(
-    amount: number, 
-    preserveSwing: boolean, 
-    preserveTempo: boolean,
-    correctionMode: string = "gentle",
-    beatAnalysisIntensity: number = 75,
-    preserveTransients: boolean = true
-  ): void {
-    this.beatQuantizationAmount = Math.max(0, Math.min(1, amount));
-    this.preserveSwing = preserveSwing;
-    this.preserveTempo = preserveTempo;
-    this.correctionMode = correctionMode;
-    this.beatAnalysisIntensity = Math.max(25, Math.min(100, beatAnalysisIntensity));
-    
-    // Update transient preservation if changed
-    if (this.preserveTransients !== preserveTransients) {
-      this.preserveTransients = preserveTransients;
-      this.configureTransientShaper();
-      this.connectNodes();
-    }
-    
-    // Always prioritize preservation if enabled
-    const isPreserving = this.preserveTempo;
-    
-    // Base settings for each mode
-    let thresholdBase: number;
-    let ratioBase: number; 
-    let attackBase: number;
-    let releaseBase: number;
-    let enhancerFreq: number;
-    let enhancerQ: number;
-    let enhancerGainMultiplier: number;
-    
-    // Set parameters based on correction mode
-    switch (this.correctionMode) {
-      case "gentle":
-        thresholdBase = -20;
-        ratioBase = 2;
-        attackBase = 0.01;
-        releaseBase = 0.2;
-        enhancerFreq = 1000;
-        enhancerQ = 0.7;
-        enhancerGainMultiplier = 2;
-        break;
-        
-      case "balanced":
-        thresholdBase = -24;
-        ratioBase = 3;
-        attackBase = 0.005;
-        releaseBase = 0.15;
-        enhancerFreq = 1500;
-        enhancerQ = 1.0;
-        enhancerGainMultiplier = 3;
-        break;
-        
-      case "precise":
-        thresholdBase = -28;
-        ratioBase = 4;
-        attackBase = 0.003;
-        releaseBase = 0.1;
-        enhancerFreq = 2000;
-        enhancerQ = 1.3;
-        enhancerGainMultiplier = 4;
-        break;
-        
-      case "surgical":
-        thresholdBase = -32;
-        ratioBase = 6;
-        attackBase = 0.001;
-        releaseBase = 0.05;
-        enhancerFreq = 2500;
-        enhancerQ = 1.5;
-        enhancerGainMultiplier = 5;
-        break;
-        
-      default: // fallback to gentle
-        thresholdBase = -20;
-        ratioBase = 2;
-        attackBase = 0.01;
-        releaseBase = 0.2;
-        enhancerFreq = 1000;
-        enhancerQ = 0.7;
-        enhancerGainMultiplier = 2;
-    }
-    
-    // Apply beat analysis intensity adjustment
-    const analysisIntensityFactor = this.beatAnalysisIntensity / 75; // Normalize to 1.0 at default value
-    
-    // Higher beat analysis intensity means more aggressive detection and correction
-    thresholdBase -= (analysisIntensityFactor - 1) * 4; // Lower threshold = more detection
-    ratioBase *= Math.max(0.8, Math.min(1.2, analysisIntensityFactor)); // Scale ratio by intensity
-    attackBase /= analysisIntensityFactor; // Lower attack = faster response
-    
-    // Apply preservation adjustments if needed
-    if (isPreserving) {
-      // In preservation mode, be more conservative with all settings
-      thresholdBase += 4; // Higher threshold = less compression
-      ratioBase = Math.max(1.5, ratioBase * 0.6); // Lower ratio = gentler compression
-      attackBase *= 1.5; // Slower attack = preserves more transients
-      releaseBase *= 1.5; // Slower release = more natural decay
-      enhancerGainMultiplier *= 0.7; // Less enhancement = more natural sound
-    }
-    
-    // Apply swing preservation adjustments
-    if (this.preserveSwing) {
-      // Gentler release preserves groove
-      releaseBase *= 1.3;
-    }
-    
-    // Apply transient preservation adjustments
-    if (this.preserveTransients) {
-      // Slower attack to preserve transient peaks
-      attackBase *= 1.2;
-      // Less compression to preserve dynamics
-      ratioBase *= 0.85;
-    }
-    
-    // Set the adjusted compressor settings
-    this.compressor.threshold.value = thresholdBase;
-    this.compressor.ratio.value = ratioBase + (this.beatQuantizationAmount * (this.correctionMode === "surgical" ? 1.0 : 0.5)); 
-    this.compressor.attack.value = attackBase;
-    this.compressor.release.value = releaseBase;
-    
-    // Set the enhancer settings
-    this.enhancer.frequency.value = enhancerFreq;
-    this.enhancer.Q.value = enhancerQ;
-    this.enhancer.gain.value = this.beatQuantizationAmount * enhancerGainMultiplier;
-  }
-  
-  // Connect to audio source
-  connectSource(source: AudioNode): void {
-    source.connect(this.inputNode);
-  }
-  
-  // Get output node to connect to destination
-  getOutputNode(): AudioNode {
-    return this.outputNode;
-  }
-}
-
-// Main processing engine that combines all processors
-export class AudioMasteringEngine {
-  private audioContext?: AudioContextType;
-  private sourceNode?: AudioBufferSourceNode;
-  private gainNode?: GainNode;
-  private loudnessAnalyzer?: LoudnessAnalyzer;
-  private noiseProcessor?: NoiseSuppressionProcessor;
-  private contentProcessor?: ContentAwareProcessor;
-  private phaseProcessor?: PhaseCoherenceProcessor;
-  private rhythmicProcessor?: RhythmicProcessor;
-  private dryWetMix: number = 100;
-  private dryBuffer?: AudioBuffer;
-  private wetBuffer?: AudioBuffer;
-  private originalBuffer?: AudioBuffer;
-  private targetLufs: number = -14;
-  private isLoading: boolean = false;
-  
-  // Check if audio is loaded and ready for processing
-  isAudioLoaded(): boolean {
-    return !!this.originalBuffer && !!this.audioContext && !this.isLoading;
-  }
-  
-  // Initialize the audio context
-  initialize(): void {
     try {
-      if (!this.audioContext) {
-        this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-        console.log("Audio context initialized successfully");
-      }
-    } catch (e) {
-      console.error('Web Audio API is not supported in this browser', e);
-      toast({
-        title: "Audio Processing Error",
-        description: "Web Audio API is not supported in this browser",
-        variant: "destructive"
+      this.audioContext = new AudioContext();
+      console.log("Audio context initialized successfully");
+      
+      // Initialize AI engine in background
+      this.aiEngine.initialize().catch(error => {
+        console.warn("AI engine initialization failed:", error);
       });
+      
+      this.isInitialized = true;
+    } catch (error) {
+      console.error("Failed to initialize audio processor:", error);
+      throw error;
     }
   }
   
   // Load audio file
-  async loadAudio(file: File): Promise<boolean> {
+  async loadAudio(file: File): Promise<void> {
     if (!this.audioContext) {
-      this.initialize();
+      throw new Error("Audio processor not initialized");
     }
     
-    if (!this.audioContext) {
-      return false;
-    }
-    
-    this.isLoading = true;
-    this.originalBuffer = undefined; // Clear any existing buffer
-    
-    return new Promise((resolve, reject) => {
-      const fileReader = new FileReader();
-      
-      fileReader.onload = async (event) => {
-        try {
-          if (event.target?.result && this.audioContext) {
-            console.log("Audio file read, decoding...");
-            const arrayBuffer = event.target.result as ArrayBuffer;
-            this.originalBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
-            console.log("Audio buffer decoded successfully");
-            this.isLoading = false;
-            resolve(true);
-          } else {
-            this.isLoading = false;
-            console.error("Failed to read audio file or audio context not available");
-            reject(new Error('Failed to read audio file'));
-          }
-        } catch (error) {
-          this.isLoading = false;
-          console.error('Error decoding audio data', error);
-          reject(error);
-        }
-      };
-      
-      fileReader.onerror = (error) => {
-        this.isLoading = false;
-        console.error("File reader error:", error);
-        reject(error);
-      };
-      
-      console.log("Starting to read audio file");
-      fileReader.readAsArrayBuffer(file);
-    });
+    const arrayBuffer = await file.arrayBuffer();
+    this.currentAudioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
   }
   
-  // Process audio with all processors
-  async processAudio(settings: ProcessingSettings): Promise<ProcessingResults> {
-    // Double-check that audio is loaded properly
-    if (!this.isAudioLoaded()) {
-      console.error("Audio not properly loaded. Context:", !!this.audioContext, "Buffer:", !!this.originalBuffer, "Loading:", this.isLoading);
-      throw new Error('Audio context or buffer not initialized. Please ensure the audio file is fully loaded before processing.');
+  // Check if audio is loaded
+  isAudioLoaded(): boolean {
+    return this.currentAudioBuffer !== null;
+  }
+  
+  // Process audio with mastering
+  async processAudio(settings: AudioProcessingSettings): Promise<ProcessingResults> {
+    if (!this.currentAudioBuffer) {
+      throw new Error("No audio loaded");
     }
     
-    if (!this.audioContext || !this.originalBuffer) {
-      throw new Error('Audio context or buffer not initialized');
-    }
+    console.log("Processing audio with settings:", settings);
     
-    console.log("Creating offline context for processing");
-    
-    // Check if AI processing is enabled
-    if (settings.enableAI) {
-      try {
-        console.log("Using AI audio processing");
-        
-        // Process with AI engine
-        const aiResult = await aiAudioProcessor.processAudio(
-          this.originalBuffer,
-          {
-            enableNoiseReduction: settings.aiNoiseReduction || false,
-            noiseReductionStrategy: settings.noiseReductionStrategy || 'auto',
-            noiseReductionIntensity: settings.noiseReductionIntensity || 50,
-            enableContentClassification: settings.contentClassification || false,
-            enableAutoProcessing: settings.autoProcessing || false,
-            enableArtifactElimination: settings.artifactElimination || false,
-            preserveTone: settings.preserveTone
-          }
-        );
-        
-        // If AI processing succeeded, use the resulting buffer
-        if (aiResult.processedBuffer) {
-          this.wetBuffer = aiResult.processedBuffer;
-          this.dryBuffer = this.originalBuffer;
-          this.dryWetMix = settings.dryWet;
-          
-          // Fake measurements since we don't have real ones
-          const inputLufs = -18 - (Math.random() * 10);
-          const inputPeak = -6 - (Math.random() * 10);
-          const outputLufs = settings.targetLufs;
-          const outputPeak = Math.min(0, inputPeak + 2);
-          
-          return {
-            inputLufs,
-            outputLufs,
-            inputPeak,
-            outputPeak,
-            noiseReduction: settings.aiNoiseReduction ? settings.noiseReductionIntensity || 8 : 0,
-            contentType: aiResult.contentType,
-            artifactsEliminated: aiResult.artifactsFound
-          };
-        }
-      } catch (error) {
-        console.error("AI processing failed, falling back to standard processing:", error);
-        toast({
-          title: "AI Processing Failed",
-          description: "Falling back to standard audio processing",
-          variant: "default"
-        });
-        // Continue with standard processing
-      }
-    }
-    
-    // Extract beat correction settings from settings if available
-    const beatCorrectionMode = settings.beatCorrectionMode || "gentle";
-    const beatAnalysisIntensity = settings.beatAnalysisIntensity || 75;
-    const transientPreservation = settings.transientPreservation !== undefined ? settings.transientPreservation : true;
-    const phaseAlignment = settings.phaseAlignment !== undefined ? settings.phaseAlignment : true;
-    
-    // Create offline context for processing
-    const offlineContext = new OfflineAudioContext(
-      this.originalBuffer.numberOfChannels,
-      this.originalBuffer.length,
-      this.originalBuffer.sampleRate
-    );
-    
-    // Create source node
-    const sourceNode = offlineContext.createBufferSource();
-    sourceNode.buffer = this.originalBuffer;
-    
-    console.log("Setting up audio processing chain with preservation settings:", {
-      preserveTempo: settings.preserveTempo ?? true,
+    // Convert settings to AI processing settings
+    const aiSettings: AIAudioProcessingSettings = {
+      enableNoiseReduction: settings.noiseReduction > 0,
+      noiseReductionStrategy: 'auto',
+      noiseReductionIntensity: settings.noiseReduction,
       preserveTone: settings.preserveTone ?? true,
-      swingPreservation: settings.swingPreservation ?? true,
-      beatCorrectionMode,
-      beatAnalysisIntensity,
-      transientPreservation,
-      phaseAlignment
-    });
+      enableContentClassification: true,
+      enableAutoProcessing: true,
+      enableArtifactElimination: true
+    };
     
-    // Setup processors with preservation settings
-    const loudnessAnalyzer = new LoudnessAnalyzer(offlineContext);
-    const noiseProcessor = new NoiseSuppressionProcessor(
-      offlineContext, 
-      settings.noiseReduction / 100,
-      settings.preserveTone ?? true
-    );
-    const contentProcessor = new ContentAwareProcessor(
-      offlineContext, 
-      settings.mode,
-      settings.preserveTone ?? true
-    );
-    const phaseProcessor = new PhaseCoherenceProcessor(
-      offlineContext,
-      phaseAlignment
-    );
-    const rhythmicProcessor = new RhythmicProcessor(
-      offlineContext,
-      settings.preserveTempo ?? true,
-      transientPreservation
-    );
+    let processedBuffer = this.currentAudioBuffer;
+    let contentType: string[] = [];
+    let artifactsFound = false;
     
-    // Apply settings
-    if (settings.beatQuantization !== undefined) {
-      rhythmicProcessor.setBeatQuantization(
-        settings.beatQuantization / 100,
-        settings.swingPreservation || true,
-        settings.preserveTempo ?? true,
-        beatCorrectionMode,
-        beatAnalysisIntensity,
-        transientPreservation
-      );
-    }
-    
-    // Connect the processing chain
-    sourceNode.connect(loudnessAnalyzer.getOutputNode());
-    loudnessAnalyzer.connectSource(sourceNode);
-    
-    noiseProcessor.connectSource(loudnessAnalyzer.getOutputNode());
-    contentProcessor.connectSource(noiseProcessor.getOutputNode());
-    phaseProcessor.connectSource(contentProcessor.getOutputNode());
-    rhythmicProcessor.connectSource(phaseProcessor.getOutputNode());
-    
-    // Create a gain node for the final output
-    const outputGain = offlineContext.createGain();
-    rhythmicProcessor.getOutputNode().connect(outputGain);
-    outputGain.connect(offlineContext.destination);
-    
-    // Get initial measurements
-    const inputLufs = -18 - (Math.random() * 10); // Simulate measurement
-    const inputPeak = -6 - (Math.random() * 10);  // Simulate measurement
-    
-    // Calculate gain needed for LUFS normalization
-    const lufsGainFactor = Math.pow(10, (settings.targetLufs - inputLufs) / 20);
-    
-    // Apply the gain while preventing clipping
-    const peakWithGain = inputPeak + 20 * Math.log10(lufsGainFactor);
-    const finalGain = peakWithGain >= 0 
-      ? lufsGainFactor * Math.pow(10, -peakWithGain / 20) 
-      : lufsGainFactor;
-      
-    outputGain.gain.value = finalGain;
-    
-    console.log("Starting audio rendering");
-    
-    // Start rendering
-    sourceNode.start(0);
-    
+    // Try AI processing if available
     try {
-      // Render audio
-      console.log("Waiting for offline context rendering to complete");
-      const renderedBuffer = await offlineContext.startRendering();
-      console.log("Rendering completed successfully");
-      
-      // Store the processed buffer
-      this.wetBuffer = renderedBuffer;
-      this.dryBuffer = this.originalBuffer;
-      
-      // Set the mix (100 = 100% wet/processed)
-      this.dryWetMix = settings.dryWet;
-      
-      // Estimate output measurements
-      const noiseReduction = noiseProcessor.estimateNoiseReduction();
-      const outputLufs = settings.targetLufs;
-      const outputPeak = Math.min(0, inputPeak + 20 * Math.log10(finalGain));
-      
-      return {
-        inputLufs,
-        outputLufs,
-        inputPeak,
-        outputPeak,
-        noiseReduction
-      };
+      if (this.aiEngine.isReady()) {
+        console.log("Using AI processing");
+        const aiResult = await this.aiEngine.processAudio(this.currentAudioBuffer, aiSettings);
+        processedBuffer = aiResult.processedBuffer;
+        contentType = aiResult.contentType;
+        artifactsFound = aiResult.artifactsFound;
+      } else {
+        console.log("AI engine not ready, using basic processing");
+        processedBuffer = await this.basicProcessing(this.currentAudioBuffer, settings);
+      }
     } catch (error) {
-      console.error("Error during audio rendering:", error);
-      throw new Error(`Error rendering audio: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.warn("AI processing failed, falling back to basic processing:", error);
+      processedBuffer = await this.basicProcessing(this.currentAudioBuffer, settings);
     }
+    
+    // Analyze the results
+    const inputLufs = this.calculateLUFS(this.currentAudioBuffer);
+    const outputLufs = this.calculateLUFS(processedBuffer);
+    const inputPeak = this.calculatePeak(this.currentAudioBuffer);
+    const outputPeak = this.calculatePeak(processedBuffer);
+    
+    return {
+      inputLufs,
+      outputLufs,
+      inputPeak,
+      outputPeak,
+      noiseReduction: settings.noiseReduction,
+      contentType,
+      artifactsFound
+    };
   }
   
-  // Create a mixed buffer using dry/wet ratio
-  getMixedBuffer(): AudioBuffer | undefined {
-    if (!this.audioContext || !this.wetBuffer || !this.dryBuffer) {
-      return undefined;
+  // Basic audio processing fallback
+  private async basicProcessing(audioBuffer: AudioBuffer, settings: AudioProcessingSettings): Promise<AudioBuffer> {
+    if (!this.audioContext) {
+      throw new Error("Audio context not available");
     }
     
-    // If mix is 100% wet, just return wet buffer
-    if (this.dryWetMix >= 100) {
-      return this.wetBuffer;
-    }
-    
-    // If mix is 0% wet, just return dry buffer
-    if (this.dryWetMix <= 0) {
-      return this.dryBuffer;
-    }
-    
-    // Create a new buffer for the mix
-    const mixedBuffer = this.audioContext.createBuffer(
-      this.wetBuffer.numberOfChannels,
-      this.wetBuffer.length,
-      this.wetBuffer.sampleRate
+    const outputBuffer = this.audioContext.createBuffer(
+      audioBuffer.numberOfChannels,
+      audioBuffer.length,
+      audioBuffer.sampleRate
     );
     
-    // Mix dry and wet buffers
-    const wetGain = this.dryWetMix / 100;
-    const dryGain = 1 - wetGain;
+    // Apply basic gain adjustment based on target LUFS
+    const gainAdjustment = this.calculateGainAdjustment(settings.targetLufs);
     
-    for (let channel = 0; channel < mixedBuffer.numberOfChannels; channel++) {
-      const dryData = this.dryBuffer.getChannelData(channel);
-      const wetData = this.wetBuffer.getChannelData(channel);
-      const mixedData = mixedBuffer.getChannelData(channel);
+    for (let channel = 0; channel < audioBuffer.numberOfChannels; channel++) {
+      const inputData = audioBuffer.getChannelData(channel);
+      const outputData = outputBuffer.getChannelData(channel);
       
-      for (let i = 0; i < mixedBuffer.length; i++) {
-        mixedData[i] = (dryData[i] * dryGain) + (wetData[i] * wetGain);
+      for (let i = 0; i < inputData.length; i++) {
+        outputData[i] = inputData[i] * gainAdjustment;
+        // Simple limiter
+        if (outputData[i] > 0.95) outputData[i] = 0.95;
+        if (outputData[i] < -0.95) outputData[i] = -0.95;
       }
     }
     
-    return mixedBuffer;
+    return outputBuffer;
   }
   
-  // Convert processed audio to a file
+  // Get processed file
   async getProcessedFile(originalFile: File): Promise<File> {
-    const mixedBuffer = this.getMixedBuffer();
-    
-    if (!mixedBuffer) {
-      throw new Error('No processed audio available');
+    if (!this.currentAudioBuffer || !this.audioContext) {
+      throw new Error("No processed audio available");
     }
     
-    // Convert audio buffer to WAV
-    const wavData = this.audioBufferToWav(mixedBuffer);
+    // Create a simple WAV file from the processed buffer
+    const wavData = this.audioBufferToWav(this.currentAudioBuffer);
+    const blob = new Blob([wavData], { type: 'audio/wav' });
     
-    // Create new file name
-    const nameParts = originalFile.name.split('.');
-    const extension = nameParts.pop() || 'wav';
-    const baseName = nameParts.join('.');
-    const newName = `${baseName}_mastered.${extension}`;
-    
-    // Create a new File object
-    return new File([wavData], newName, {
-      type: `audio/${extension === 'mp3' ? 'mpeg' : extension}`
-    });
+    const processedFileName = originalFile.name.replace(/\.[^/.]+$/, '') + '_mastered.wav';
+    return new File([blob], processedFileName, { type: 'audio/wav' });
   }
   
-  // Convert AudioBuffer to WAV format
-  private audioBufferToWav(buffer: AudioBuffer): Blob {
-    // Implementation based on https://github.com/Jam3/audiobuffer-to-wav
-    const numChannels = buffer.numberOfChannels;
-    const sampleRate = buffer.sampleRate;
-    const format = 1; // PCM
-    const bitDepth = 16;
+  // Helper: Calculate LUFS (simplified)
+  private calculateLUFS(audioBuffer: AudioBuffer): number {
+    let sum = 0;
+    let sampleCount = 0;
     
-    const bytesPerSample = bitDepth / 8;
-    const blockAlign = numChannels * bytesPerSample;
-    
-    const dataLength = buffer.length * blockAlign;
-    const bufferLength = 44 + dataLength;
-    
-    const arrayBuffer = new ArrayBuffer(bufferLength);
-    const view = new DataView(arrayBuffer);
-    
-    // RIFF identifier
-    this.writeString(view, 0, 'RIFF');
-    // file length minus RIFF identifier length and file description length
-    view.setUint32(4, 36 + dataLength, true);
-    // RIFF type
-    this.writeString(view, 8, 'WAVE');
-    // format chunk identifier
-    this.writeString(view, 12, 'fmt ');
-    // format chunk length
-    view.setUint32(16, 16, true);
-    // sample format (raw)
-    view.setUint16(20, format, true);
-    // channel count
-    view.setUint16(22, numChannels, true);
-    // sample rate
-    view.setUint32(24, sampleRate, true);
-    // byte rate (sample rate * block align)
-    view.setUint32(28, sampleRate * blockAlign, true);
-    // block align (channel count * bytes per sample)
-    view.setUint16(32, blockAlign, true);
-    // bits per sample
-    view.setUint16(34, bitDepth, true);
-    // data chunk identifier
-    this.writeString(view, 36, 'data');
-    // data chunk length
-    view.setUint32(40, dataLength, true);
-    
-    // Write the PCM samples
-    const offset = 44;
-    let pos = offset;
-    
-    for (let i = 0; i < buffer.length; i++) {
-      for (let channel = 0; channel < numChannels; channel++) {
-        const sample = buffer.getChannelData(channel)[i];
-        // Clamp between -1 and 1
-        const clamped = Math.max(-1, Math.min(1, sample));
-        // Scale to int16 range
-        const scaled = clamped < 0 ? clamped * 32768 : clamped * 32767;
-        // Write as int16
-        view.setInt16(pos, scaled, true);
-        pos += 2;
+    for (let channel = 0; channel < audioBuffer.numberOfChannels; channel++) {
+      const channelData = audioBuffer.getChannelData(channel);
+      for (let i = 0; i < channelData.length; i++) {
+        sum += channelData[i] * channelData[i];
+        sampleCount++;
       }
     }
     
-    return new Blob([view], { type: 'audio/wav' });
+    const rms = Math.sqrt(sum / sampleCount);
+    return 20 * Math.log10(rms) - 0.691; // Rough LUFS approximation
   }
   
-  private writeString(view: DataView, offset: number, string: string): void {
-    for (let i = 0; i < string.length; i++) {
-      view.setUint8(offset + i, string.charCodeAt(i));
+  // Helper: Calculate peak
+  private calculatePeak(audioBuffer: AudioBuffer): number {
+    let peak = 0;
+    
+    for (let channel = 0; channel < audioBuffer.numberOfChannels; channel++) {
+      const channelData = audioBuffer.getChannelData(channel);
+      for (let i = 0; i < channelData.length; i++) {
+        peak = Math.max(peak, Math.abs(channelData[i]));
+      }
     }
+    
+    return 20 * Math.log10(peak);
   }
   
-  // Clean up resources
+  // Helper: Calculate gain adjustment
+  private calculateGainAdjustment(targetLufs: number): number {
+    if (!this.currentAudioBuffer) return 1;
+    
+    const currentLufs = this.calculateLUFS(this.currentAudioBuffer);
+    const lufsAdjustment = targetLufs - currentLufs;
+    return Math.pow(10, lufsAdjustment / 20);
+  }
+  
+  // Helper: Convert AudioBuffer to WAV
+  private audioBufferToWav(audioBuffer: AudioBuffer): ArrayBuffer {
+    const length = audioBuffer.length * audioBuffer.numberOfChannels * 2;
+    const buffer = new ArrayBuffer(44 + length);
+    const view = new DataView(buffer);
+    
+    // WAV header
+    const writeString = (offset: number, string: string) => {
+      for (let i = 0; i < string.length; i++) {
+        view.setUint8(offset + i, string.charCodeAt(i));
+      }
+    };
+    
+    writeString(0, 'RIFF');
+    view.setUint32(4, 36 + length, true);
+    writeString(8, 'WAVE');
+    writeString(12, 'fmt ');
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true);
+    view.setUint16(22, audioBuffer.numberOfChannels, true);
+    view.setUint32(24, audioBuffer.sampleRate, true);
+    view.setUint32(28, audioBuffer.sampleRate * audioBuffer.numberOfChannels * 2, true);
+    view.setUint16(32, audioBuffer.numberOfChannels * 2, true);
+    view.setUint16(34, 16, true);
+    writeString(36, 'data');
+    view.setUint32(40, length, true);
+    
+    // Convert float samples to 16-bit PCM
+    let offset = 44;
+    for (let i = 0; i < audioBuffer.length; i++) {
+      for (let channel = 0; channel < audioBuffer.numberOfChannels; channel++) {
+        const sample = Math.max(-1, Math.min(1, audioBuffer.getChannelData(channel)[i]));
+        view.setInt16(offset, sample * 0x7FFF, true);
+        offset += 2;
+      }
+    }
+    
+    return buffer;
+  }
+  
+  // Dispose resources
   dispose(): void {
     if (this.audioContext) {
-      // Check if the audioContext has a close method (only available on AudioContext, not BaseAudioContext)
-      if ('close' in this.audioContext && typeof (this.audioContext as any).close === 'function') {
-        (this.audioContext as AudioContext).close().catch(console.error);
-      }
-      this.audioContext = undefined;
+      this.audioContext.close();
+      this.audioContext = null;
     }
-    this.sourceNode = undefined;
-    this.gainNode = undefined;
-    this.loudnessAnalyzer = undefined;
-    this.noiseProcessor = undefined;
-    this.contentProcessor = undefined;
-    this.phaseProcessor = undefined;
-    this.rhythmicProcessor = undefined;
-    this.dryBuffer = undefined;
-    this.wetBuffer = undefined;
-    this.originalBuffer = undefined;
-    this.isLoading = false;
+    this.currentAudioBuffer = null;
+    this.aiEngine.dispose();
+    this.isInitialized = false;
   }
 }
 
 // Export singleton instance
-export const audioProcessor = new AudioMasteringEngine();
+export const audioProcessor = new AudioProcessor();
+export type { ProcessingResults, AudioProcessingSettings };

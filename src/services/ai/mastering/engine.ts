@@ -46,13 +46,16 @@ export class AIAudioMasteringEngine {
       this.isInitialized = result.isInitialized;
       this.hasGPUSupport = result.hasGPUSupport;
       this.processingMode = result.processingMode;
+      this.isInitializing = false;
       
       return this.isInitialized;
     } catch (error) {
       console.error('AI engine initialization failed:', error);
-      return false;
-    } finally {
       this.isInitializing = false;
+      // Always fall back to remote API mode
+      this.processingMode = ProcessingMode.REMOTE_API;
+      this.isInitialized = true; // Consider remote API as "initialized"
+      return true;
     }
   }
   
@@ -89,6 +92,7 @@ export class AIAudioMasteringEngine {
     audioBuffer: AudioBuffer,
     settings: AIAudioProcessingSettings
   ): Promise<AIAudioProcessingResult> {
+    // Ensure initialization
     if (!this.isInitialized) {
       console.log('AI engine not initialized, attempting to initialize...');
       const initialized = await this.initialize();
