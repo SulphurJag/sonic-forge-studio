@@ -1,4 +1,5 @@
 
+import { pipeline } from '@huggingface/transformers';
 import { ModelStatusTracker } from './modelStatusTracker';
 import { toast } from "@/hooks/use-toast";
 
@@ -30,54 +31,66 @@ export class TransformersModelLoader {
     this.statusTracker.setLoading(modelKey);
     
     try {
-      // Since transformers.js may not be fully available, create a mockup implementation
-      // that will be compatible with our usage patterns
-      console.log(`Loading model ${modelKey} (${modelId}) for task ${task}`);
+      console.log(`Loading ${task} model: ${modelId}`);
       
-      // Create a mock pipeline that simulates successful loading
-      const mockPipeline = async (input: any) => {
-        console.log(`Processing with ${modelId} for ${task} task:`, input);
-        
-        // Return different mock responses based on task type
-        if (task === 'automatic-speech-recognition') {
-          return { text: "Speech recognition output would be here" };
-        } else if (task === 'audio-classification') {
-          return [
-            { label: "music", score: 0.95 },
-            { label: "speech", score: 0.05 }
-          ];
-        } else {
-          return { result: "Model output would be here" };
-        }
-      };
+      // Load the actual pipeline from Hugging Face
+      const modelPipeline = await pipeline(task, modelId, {
+        device: 'webgpu', // Try WebGPU first
+        dtype: 'fp32'
+      });
       
       // Cache the model
-      this.modelCache.set(modelKey, mockPipeline);
+      this.modelCache.set(modelKey, modelPipeline);
       
       // Update status to initialized
       this.statusTracker.setInitialized(modelKey);
       
-      console.log(`Model ${modelKey} loaded successfully (simulated)`);
+      console.log(`Model ${modelKey} loaded successfully`);
       toast({
-        title: "Model Initialized",
-        description: `${modelKey} is ready to use`,
+        title: "Model Loaded",
+        description: `${modelKey} is ready for use`,
         variant: "default"
       });
       
-      return mockPipeline;
-    } catch (error) {
-      console.error(`Failed to load model ${modelKey}:`, error);
+      return modelPipeline;
+    } catch (webgpuError) {
+      console.warn(`WebGPU loading failed for ${modelKey}, trying CPU:`, webgpuError);
       
-      // Update status with error
-      this.statusTracker.setError(modelKey, error as Error);
-      
-      toast({
-        title: "Model Loading Failed",
-        description: `Could not initialize ${modelKey}`,
-        variant: "destructive"
-      });
-      
-      return null;
+      try {
+        // Fallback to CPU if WebGPU fails
+        const modelPipeline = await pipeline(task, modelId, {
+          device: 'cpu',
+          dtype: 'fp32'
+        });
+        
+        // Cache the model
+        this.modelCache.set(modelKey, modelPipeline);
+        
+        // Update status to initialized
+        this.statusTracker.setInitialized(modelKey);
+        
+        console.log(`Model ${modelKey} loaded successfully on CPU`);
+        toast({
+          title: "Model Loaded (CPU)",
+          description: `${modelKey} is ready (using CPU)`,
+          variant: "default"
+        });
+        
+        return modelPipeline;
+      } catch (error) {
+        console.error(`Failed to load model ${modelKey}:`, error);
+        
+        // Update status with error
+        this.statusTracker.setError(modelKey, error as Error);
+        
+        toast({
+          title: "Model Loading Failed",
+          description: `Could not initialize ${modelKey}`,
+          variant: "destructive"
+        });
+        
+        return null;
+      }
     }
   }
 }

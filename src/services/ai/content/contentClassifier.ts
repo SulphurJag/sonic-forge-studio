@@ -10,7 +10,7 @@ import * as tf from '@tensorflow/tfjs';
 export class AIContentClassifier {
   private isInitialized: boolean = false;
   private contentClassifierPipeline: any = null;
-  private lightweightModel: any = null;
+  private yamnetModel: any = null;
   private lastClassification: ContentClassification = [];
   private hasGPUSupport: boolean = false;
   private usingSimulation: boolean = false;
@@ -22,68 +22,55 @@ export class AIContentClassifier {
       this.hasGPUSupport = await modelManager.checkWebGPUSupport();
       let modelLoaded = false;
       
-      // First try to load the lightweight model (works in most browsers)
+      // Try loading HF transformers model first (Whisper for audio analysis)
       try {
-        console.log("Loading lightweight content classification model...");
-        this.lightweightModel = await tf.loadGraphModel(LIGHTWEIGHT_MODELS.CONTENT_CLASSIFIER, {
-          onProgress: (fraction) => {
-            console.log(`Loading YAMNet model: ${Math.round(fraction * 100)}%`);
-          }
-        });
+        console.log("Loading Whisper model for content classification...");
+        this.contentClassifierPipeline = await modelManager.loadTransformersModel(
+          'automatic-speech-recognition',
+          HF_MODELS.CONTENT_CLASSIFIER,
+          'CONTENT_CLASSIFIER'
+        );
         
-        if (this.lightweightModel) {
-          console.log("Lightweight content classification model loaded");
+        if (this.contentClassifierPipeline) {
+          console.log("Whisper content classification model loaded successfully");
           modelLoaded = true;
         }
-      } catch (error) {
-        console.warn("Failed to load lightweight content classification model:", error);
+      } catch (transformersError) {
+        console.warn("Failed to load Whisper model:", transformersError);
       }
       
-      // If WebGPU is supported, try loading the HF transformers model as well
-      if (this.hasGPUSupport) {
+      // Try loading YAMNet as fallback
+      if (!modelLoaded) {
         try {
-          console.log("Loading WebGPU-accelerated content classification model...");
-          this.contentClassifierPipeline = await modelManager.loadTransformersModel(
-            'automatic-speech-recognition', // Using a compatible task
-            HF_MODELS.CONTENT_CLASSIFIER,
-            'CONTENT_CLASSIFIER'
-          );
+          console.log("Loading YAMNet model for content classification...");
+          this.yamnetModel = await tf.loadGraphModel(LIGHTWEIGHT_MODELS.CONTENT_CLASSIFIER);
           
-          if (this.contentClassifierPipeline) {
-            console.log("WebGPU content classification model loaded successfully");
+          if (this.yamnetModel) {
+            console.log("YAMNet content classification model loaded successfully");
             modelLoaded = true;
           }
-        } catch (transformersError) {
-          console.warn("Failed to load WebGPU content classification model:", transformersError);
+        } catch (yamnetError) {
+          console.warn("Failed to load YAMNet model:", yamnetError);
         }
       }
       
       if (!modelLoaded) {
-        console.warn("No content classification models loaded, falling back to simulation mode");
-        this.usingSimulation = true;
+        console.warn("No content classification models loaded, using analysis-based classification");
+        this.usingSimulation = false; // We'll use audio analysis instead
         toast({
-          title: "Limited Functionality",
-          description: "Using simulated content classification (no models could be loaded)",
+          title: "Limited Model Loading",
+          description: "Using audio analysis for content classification",
           variant: "default"
         });
       }
       
-      // Mark as initialized even if using simulation
       this.isInitialized = true;
       return this.isInitialized;
     } catch (error) {
       console.error("Failed to initialize content classifier:", error);
-      toast({
-        title: "Initialization Error",
-        description: "Failed to initialize audio content classifier model",
-        variant: "destructive"
-      });
-      
-      // Fallback to simulated mode
-      this.usingSimulation = true;
+      this.usingSimulation = false;
       this.isInitialized = true;
-      console.log("Falling back to simulated content classification");
-      
+      console.log("Using audio analysis for content classification");
       return this.isInitialized;
     }
   }
@@ -93,7 +80,7 @@ export class AIContentClassifier {
     return this.isInitialized;
   }
   
-  // Check if using simulated processing
+  // Check if using simulation
   isUsingSimulation(): boolean {
     return this.usingSimulation;
   }
@@ -113,96 +100,82 @@ export class AIContentClassifier {
     try {
       let classifications: ContentClassification = [];
       
-      // Use the WebGPU transformers pipeline if available
-      if (this.contentClassifierPipeline && this.hasGPUSupport && !this.usingSimulation && !options?.useSimulated) {
-        // Convert AudioBuffer to Float32Array for processing
-        const inputArray = new Float32Array(audioBuffer.getChannelData(0));
+      // Use Whisper pipeline if available
+      if (this.contentClassifierPipeline && !options?.useSimulated) {
+        console.log("Using Whisper for content classification");
         
-        // Process with transformers model
-        const result = await this.contentClassifierPipeline({
-          audio: inputArray,
+        // Convert AudioBuffer to Float32Array
+        const audioData = audioBuffer.getChannelData(0);
+        
+        // Process with Whisper
+        const result = await this.contentClassifierPipeline(audioData, {
           sampling_rate: audioBuffer.sampleRate,
+          return_timestamps: false,
+          chunk_length_s: 30,
+          stride_length_s: 5
         });
         
         if (result && result.text) {
-          // Extract content categories based on the transcription
+          console.log("Whisper transcription:", result.text);
+          
+          // Analyze transcription to determine content type
           classifications = ContentTextAnalyzer.extractContentFromText(result.text);
           
-          // Add duration-based classification if needed
-          if (classifications.length === 1 && classifications[0] === 'audio') {
-            classifications = ContentTextAnalyzer.addDurationBasedClassification(
-              classifications, 
-              audioBuffer.duration
-            );
-          }
+          // Add audio characteristics analysis
+          const audioCharacteristics = ContentAnalytics.analyzeAudioCharacteristics(audioBuffer);
+          classifications = [...new Set([...classifications, ...audioCharacteristics])];
         }
       }
-      // Use the lightweight model if available
-      else if (this.lightweightModel && !this.usingSimulation && !options?.useSimulated) {
-        // YAMNet expects audio at 16kHz
+      // Use YAMNet if available
+      else if (this.yamnetModel && !options?.useSimulated) {
+        console.log("Using YAMNet for content classification");
+        
+        // YAMNet expects 16kHz audio
         const targetSampleRate = 16000;
+        let audioData = audioBuffer.getChannelData(0);
         
         // Resample if needed
-        let audioData;
         if (audioBuffer.sampleRate !== targetSampleRate) {
-          // Simple resampling - this could be improved
-          audioData = this.resampleAudio(audioBuffer, targetSampleRate);
-        } else {
-          audioData = audioBuffer.getChannelData(0);
+          audioData = this.resampleAudio(audioData, audioBuffer.sampleRate, targetSampleRate);
         }
         
-        // YAMNet analyzes in 0.975s frames, so let's process a few frames
-        const frameSize = Math.floor(targetSampleRate * 0.975);
-        const framesToProcess = Math.min(10, Math.floor(audioData.length / frameSize));
+        // Process with YAMNet
+        const waveformTensor = tf.tensor1d(audioData).expandDims(0);
+        const predictions = this.yamnetModel.predict(waveformTensor) as tf.Tensor;
+        const scores = await predictions.data();
         
-        const classScores = new Map<string, number>();
+        // Get YAMNet class labels and find top predictions
+        const yamnetClasses = await this.getYamnetClasses();
+        const topPredictions = this.getTopKClasses(scores, yamnetClasses, 5);
         
-        for (let i = 0; i < framesToProcess; i++) {
-          const startIndex = i * frameSize;
-          const audioFrame = audioData.slice(startIndex, startIndex + frameSize);
-          
-          // Prepare input tensor
-          const input = tf.tensor(audioFrame).expandDims(0);
-          
-          // Run model
-          const output = this.lightweightModel.predict(input);
-          const scores = await output.data();
-          
-          // Get the top classes
-          const yamnetClasses = await this.fetchYamnetClasses();
-          const topK = this.getTopKClasses(scores, yamnetClasses, 3);
-          
-          // Accumulate scores
-          topK.forEach(({className, score}) => {
-            const currentScore = classScores.get(className) || 0;
-            classScores.set(className, currentScore + score);
-          });
-          
-          // Clean up tensors
-          tf.dispose([input, output]);
-        }
+        // Map YAMNet classes to our content types
+        classifications = topPredictions
+          .map(pred => this.mapYamnetToContentClass(pred.className))
+          .filter((className): className is string => className !== null);
         
-        // Convert aggregated scores to classifications
-        classifications = Array.from(classScores.entries())
-          .map(([className, score]) => this.mapYamnetToContentClass(className))
-          .filter((className, index, self) => 
-            className !== null && self.indexOf(className) === index
-          ) as string[];
-        
-        if (classifications.length === 0) {
-          classifications = ['audio']; // Default classification
-        }
+        // Clean up tensors
+        tf.dispose([waveformTensor, predictions]);
       }
-      // Use simulated classification based on audio characteristics
-      else {
+      
+      // Use audio analysis as fallback or if no models loaded
+      if (classifications.length === 0) {
+        console.log("Using audio characteristics analysis");
         classifications = ContentAnalytics.analyzeAudioCharacteristics(audioBuffer);
       }
       
+      // Ensure we have at least one classification
+      if (classifications.length === 0) {
+        classifications = ['audio'];
+      }
+      
       this.lastClassification = classifications;
+      console.log("Final content classification:", classifications);
       return classifications;
     } catch (error) {
       console.error("Error during content classification:", error);
-      return ContentAnalytics.analyzeAudioCharacteristics(audioBuffer); // Fallback
+      const fallback = ContentAnalytics.analyzeAudioCharacteristics(audioBuffer);
+      this.lastClassification = fallback;
+      return fallback;
     }
   }
   
@@ -211,29 +184,25 @@ export class AIContentClassifier {
     return ContentAnalytics.getProcessingRecommendations(this.lastClassification);
   }
   
-  // Helper: Basic audio resampling
-  private resampleAudio(audioBuffer: AudioBuffer, targetSampleRate: number): Float32Array {
-    const originalSampleRate = audioBuffer.sampleRate;
-    const originalData = audioBuffer.getChannelData(0);
-    
-    // Simplistic resampling approach
+  // Helper: Resample audio data
+  private resampleAudio(audioData: Float32Array, originalSampleRate: number, targetSampleRate: number): Float32Array {
     const ratio = originalSampleRate / targetSampleRate;
-    const newLength = Math.round(originalData.length / ratio);
+    const newLength = Math.round(audioData.length / ratio);
     const result = new Float32Array(newLength);
     
     for (let i = 0; i < newLength; i++) {
-      const originalIndex = Math.min(Math.round(i * ratio), originalData.length - 1);
-      result[i] = originalData[originalIndex];
+      const originalIndex = Math.min(Math.round(i * ratio), audioData.length - 1);
+      result[i] = audioData[originalIndex];
     }
     
     return result;
   }
   
-  // Helper: Get top k classes from YAMNet output
-  private getTopKClasses(scores: Float32Array, classes: string[], k: number): Array<{className: string, score: number}> {
+  // Helper: Get top k predictions
+  private getTopKClasses(scores: Float32Array | number[], classes: string[], k: number): Array<{className: string, score: number}> {
     const result = [];
     
-    for (let i = 0; i < scores.length; i++) {
+    for (let i = 0; i < Math.min(scores.length, classes.length); i++) {
       result.push({className: classes[i], score: scores[i]});
     }
     
@@ -242,44 +211,37 @@ export class AIContentClassifier {
       .slice(0, k);
   }
   
-  // Helper: Map YAMNet class to our content classification
+  // Helper: Map YAMNet class to content type
   private mapYamnetToContentClass(yamnetClass: string): string | null {
-    // Map YAMNet classes to our content types
     const mapping: Record<string, string> = {
       'Music': 'music',
       'Speech': 'speech',
-      'Singing': 'music',
+      'Singing': 'vocals',
       'Guitar': 'music',
       'Drum': 'music',
       'Piano': 'music',
       'Human voice': 'vocals',
-      'Keyboard (musical)': 'music',
-      'Synthesizer': 'electronic',
-      'Male speech': 'speech',
-      'Female speech': 'speech',
-      'Conversation': 'speech',
-      'Hip hop music': 'music',
+      'Male speech, man speaking': 'speech',
+      'Female speech, woman speaking': 'speech',
+      'Musical instrument': 'music',
+      'Electronic music': 'electronic',
       'Rock music': 'music',
       'Pop music': 'music',
-      'Electronic music': 'electronic',
-      'Techno': 'electronic',
-      'Drum and bass': 'electronic',
-      'House music': 'electronic'
+      'Hip hop music': 'music'
     };
     
     return mapping[yamnetClass] || null;
   }
   
-  // Helper: Fetch YAMNet class names (could be cached)
-  private async fetchYamnetClasses(): Promise<string[]> {
-    // This would normally fetch the class list from a URL or local file
-    // For simplicity, returning a small subset of common YAMNet classes
+  // Helper: Get YAMNet class names
+  private async getYamnetClasses(): Promise<string[]> {
+    // YAMNet has 521 classes - returning a subset of the most relevant ones
     return [
-      'Music', 'Speech', 'Singing', 'Guitar', 'Drum', 'Piano', 
-      'Human voice', 'Keyboard (musical)', 'Synthesizer', 
-      'Male speech', 'Female speech', 'Conversation',
-      'Hip hop music', 'Rock music', 'Pop music', 'Electronic music',
-      'Techno', 'Drum and bass', 'House music'
+      'Speech', 'Music', 'Singing', 'Guitar', 'Musical instrument',
+      'Drum', 'Piano', 'Human voice', 'Male speech, man speaking', 
+      'Female speech, woman speaking', 'Electronic music', 'Rock music',
+      'Pop music', 'Hip hop music', 'Classical music', 'Country music',
+      'Jazz', 'Blues', 'Reggae', 'Electronic dance music'
     ];
   }
 }

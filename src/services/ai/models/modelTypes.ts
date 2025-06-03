@@ -13,42 +13,42 @@ export const MODEL_PATHS = {
   CONTENT_CLASSIFIER_TF: "/models/content-classification/yamnet_model.json",
 };
 
-// Hugging Face model IDs for transformers.js - Updated with better open-source models
+// Hugging Face model IDs for transformers.js - Working lightweight models
 export const HF_MODELS = {
-  // Noise suppression - Facebook's Denoiser model (open-source, MIT license)
-  NOISE_SUPPRESSOR: "facebook/denoiser-dns64",
+  // Whisper tiny for audio transcription and analysis
+  CONTENT_CLASSIFIER: "onnx-community/whisper-tiny.en",
   
-  // Content classification - OpenAI Whisper Tiny (Apache 2.0 license)
-  CONTENT_CLASSIFIER: "openai/whisper-tiny.en",
+  // SpeechT5 for audio processing
+  NOISE_SUPPRESSOR: "microsoft/speecht5_tts",
   
-  // Artifact detector - Microsoft's UniSpeech model (MIT license)
-  ARTIFACT_DETECTOR: "microsoft/unispeech-sat-base-plus",
+  // Audio classification model
+  ARTIFACT_DETECTOR: "MIT/ast-finetuned-audioset-10-10-0.4593",
 };
 
-// TensorFlow.js model URLs for direct loading - Updated with open-source models
+// TensorFlow.js model URLs for direct loading
 export const TF_MODEL_URLS = {
-  // Google's RNNoise for noise reduction (BSD license)
-  NOISE_REDUCTION: "https://tfhub.dev/google/tfjs-model/rnnoise/1",
-  
-  // YAMNet for audio event detection (Apache 2.0 license)
-  ARTIFACT_DETECTOR: "https://tfhub.dev/google/tfjs-model/yamnet/tfjs/1",
-};
-
-// Lightweight alternatives that can run efficiently in browser
-export const LIGHTWEIGHT_MODELS = {
-  // RNNoise - proven open-source noise reduction (BSD license)
-  NOISE_REDUCTION: "https://tfhub.dev/google/tfjs-model/rnnoise/1",
-  
-  // YAMNet - Google's audio event detection model (Apache 2.0 license)
+  // YAMNet for audio classification
   CONTENT_CLASSIFIER: "https://tfhub.dev/google/tfjs-model/yamnet/tfjs/1",
   
-  // Simple spectral analyzer for artifact detection
+  // Simple noise reduction model
+  NOISE_REDUCTION: "https://tfhub.dev/google/tfjs-model/rnnoise/1",
+};
+
+// Lightweight alternatives that work well in browsers
+export const LIGHTWEIGHT_MODELS = {
+  // YAMNet for audio event detection
+  CONTENT_CLASSIFIER: "https://tfhub.dev/google/tfjs-model/yamnet/tfjs/1",
+  
+  // Browser-compatible noise reduction
+  NOISE_REDUCTION: "https://tfhub.dev/google/tfjs-model/rnnoise/1",
+  
+  // Simple spectral analyzer for artifacts
   ARTIFACT_DETECTOR: "https://tfhub.dev/google/tfjs-model/spice/2"
 };
 
-// Hugging Face Spaces endpoints - Updated to use open-source model endpoints
+// Hugging Face Spaces endpoints for fallback processing
 export const HF_SPACES_ENDPOINTS = {
-  NOISE_SUPPRESSION: "https://huggingface.co/spaces/facebook/denoiser",
+  NOISE_SUPPRESSION: "https://huggingface.co/spaces/speechbrain/noise-suppression",
   CONTENT_CLASSIFICATION: "https://huggingface.co/spaces/openai/whisper-jax", 
   ARTIFACT_DETECTION: "https://huggingface.co/spaces/speechbrain/audio-classification"
 };
