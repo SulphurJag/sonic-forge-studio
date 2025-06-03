@@ -15,6 +15,7 @@ class ModelManager {
   private tfLoader: TensorflowModelLoader;
   private transformersLoader: TransformersModelLoader;
   private preferredProcessingMode: ProcessingMode = ProcessingMode.REMOTE_API;
+  private isInitialized: boolean = false;
   
   constructor() {
     // Initialize model status tracker with all model keys
@@ -35,6 +36,8 @@ class ModelManager {
   
   // Detect the optimal processing mode based on device capabilities
   private async detectOptimalProcessingMode(): Promise<void> {
+    if (this.isInitialized) return;
+    
     try {
       const hasWebGPU = await WebGpuDetector.isWebGpuSupported();
       
@@ -51,9 +54,12 @@ class ModelManager {
           variant: "default"
         });
       }
+      
+      this.isInitialized = true;
     } catch (error) {
       console.error("Error detecting processing mode:", error);
       this.preferredProcessingMode = ProcessingMode.REMOTE_API;
+      this.isInitialized = true;
     }
   }
   
@@ -90,7 +96,7 @@ class ModelManager {
   
   // Load a TensorFlow.js model
   async loadTfModel(modelKey: string): Promise<any | null> {
-    const modelPath = (MODEL_PATHS as any)[modelKey];
+    const modelPath = (LIGHTWEIGHT_MODELS as any)[modelKey];
     if (!modelPath) {
       console.error(`Model path not found for key: ${modelKey}`);
       return null;
@@ -121,6 +127,14 @@ class ModelManager {
   // Get API for Hugging Face Spaces
   getHuggingFaceSpacesAPI() {
     return huggingFaceSpacesAPI;
+  }
+  
+  // Dispose of all models to free memory
+  dispose(): void {
+    this.onnxLoader.disposeAll();
+    this.tfLoader.disposeAll();
+    this.transformersLoader.disposeAll();
+    console.log("All AI models disposed");
   }
 }
 

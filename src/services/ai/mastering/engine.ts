@@ -30,7 +30,13 @@ export class AIAudioMasteringEngine {
     }
     
     if (this.isInitializing) {
-      return false;
+      // Wait for existing initialization to complete
+      let attempts = 0;
+      while (this.isInitializing && attempts < 50) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        attempts++;
+      }
+      return this.isInitialized;
     }
     
     this.isInitializing = true;
@@ -121,6 +127,10 @@ export class AIAudioMasteringEngine {
   dispose(): void {
     this.isInitialized = false;
     this.isInitializing = false;
-    // Clean up any resources if needed
+    
+    // Dispose model manager resources
+    modelManager.dispose();
+    
+    console.log("AI Audio Mastering Engine disposed");
   }
 }

@@ -33,11 +33,30 @@ export class TransformersModelLoader {
     try {
       console.log(`Loading ${task} model: ${modelId}`);
       
-      // Load the actual pipeline from Hugging Face
-      const modelPipeline = await pipeline(task, modelId, {
-        device: 'webgpu', // Try WebGPU first
-        dtype: 'fp32'
-      });
+      let modelPipeline: any;
+      
+      // Try WebGPU first if available
+      try {
+        modelPipeline = await pipeline(task, modelId, {
+          device: 'webgpu',
+          dtype: 'fp32'
+        });
+        console.log(`Model ${modelKey} loaded successfully on WebGPU`);
+      } catch (webgpuError) {
+        console.warn(`WebGPU loading failed for ${modelKey}, trying CPU:`, webgpuError);
+        
+        // Fallback to CPU
+        try {
+          modelPipeline = await pipeline(task, modelId, {
+            device: 'cpu',
+            dtype: 'fp32'
+          });
+          console.log(`Model ${modelKey} loaded successfully on CPU`);
+        } catch (cpuError) {
+          console.error(`CPU loading also failed for ${modelKey}:`, cpuError);
+          throw new Error(`Failed to load model on any device: ${modelKey}`);
+        }
+      }
       
       // Cache the model
       this.modelCache.set(modelKey, modelPipeline);
@@ -45,52 +64,36 @@ export class TransformersModelLoader {
       // Update status to initialized
       this.statusTracker.setInitialized(modelKey);
       
-      console.log(`Model ${modelKey} loaded successfully`);
       toast({
-        title: "Model Loaded",
-        description: `${modelKey} is ready for use`,
+        title: "AI Model Ready",
+        description: `${modelKey} loaded successfully`,
         variant: "default"
       });
       
       return modelPipeline;
-    } catch (webgpuError) {
-      console.warn(`WebGPU loading failed for ${modelKey}, trying CPU:`, webgpuError);
+    } catch (error) {
+      console.error(`Failed to load transformers model ${modelKey}:`, error);
       
-      try {
-        // Fallback to CPU if WebGPU fails
-        const modelPipeline = await pipeline(task, modelId, {
-          device: 'cpu',
-          dtype: 'fp32'
-        });
-        
-        // Cache the model
-        this.modelCache.set(modelKey, modelPipeline);
-        
-        // Update status to initialized
-        this.statusTracker.setInitialized(modelKey);
-        
-        console.log(`Model ${modelKey} loaded successfully on CPU`);
-        toast({
-          title: "Model Loaded (CPU)",
-          description: `${modelKey} is ready (using CPU)`,
-          variant: "default"
-        });
-        
-        return modelPipeline;
-      } catch (error) {
-        console.error(`Failed to load model ${modelKey}:`, error);
-        
-        // Update status with error
-        this.statusTracker.setError(modelKey, error as Error);
-        
-        toast({
-          title: "Model Loading Failed",
-          description: `Could not initialize ${modelKey}`,
-          variant: "destructive"
-        });
-        
-        return null;
-      }
+      // Update status with error
+      this.statusTracker.setError(modelKey, error as Error);
+      
+      toast({
+        title: "Model Loading Failed",
+        description: `Could not initialize ${modelKey}`,
+        variant: "destructive"
+      });
+      
+      return null;
     }
+  }
+  
+  // Dispose of cached models (transformers models don't have explicit dispose)
+  disposeModel(modelKey: string): void {
+    this.modelCache.delete(modelKey);
+  }
+  
+  // Clear all cached models
+  disposeAll(): void {
+    this.modelCache.clear();
   }
 }
