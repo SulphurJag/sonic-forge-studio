@@ -1,4 +1,3 @@
-
 import { AIAudioMasteringEngine } from './ai/aiAudioMasteringEngine';
 import { AIAudioProcessingSettings } from './ai/mastering/types';
 
@@ -267,4 +266,3 @@ class AudioProcessor {
 
 // Export singleton instance
 export const audioProcessor = new AudioProcessor();
-export type { ProcessingResults, AudioProcessingSettings };
