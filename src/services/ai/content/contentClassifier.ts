@@ -146,7 +146,9 @@ export class AIContentClassifier {
         
         // Get YAMNet class labels and find top predictions
         const yamnetClasses = await this.getYamnetClasses();
-        const topPredictions = this.getTopKClasses(scores, yamnetClasses, 5);
+        // Convert scores to Float32Array to match expected type
+        const scoresArray = scores instanceof Float32Array ? scores : new Float32Array(scores);
+        const topPredictions = this.getTopKClasses(scoresArray, yamnetClasses, 5);
         
         // Map YAMNet classes to our content types
         classifications = topPredictions
@@ -199,7 +201,7 @@ export class AIContentClassifier {
   }
   
   // Helper: Get top k predictions
-  private getTopKClasses(scores: Float32Array | number[], classes: string[], k: number): Array<{className: string, score: number}> {
+  private getTopKClasses(scores: Float32Array, classes: string[], k: number): Array<{className: string, score: number}> {
     const result = [];
     
     for (let i = 0; i < Math.min(scores.length, classes.length); i++) {

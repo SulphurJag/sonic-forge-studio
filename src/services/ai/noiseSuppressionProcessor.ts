@@ -153,7 +153,7 @@ export class AINoiseSuppressionProcessor {
         paddedFrame.set(frame);
         
         // Create tensor for RNNoise
-        const inputTensor = tf.tensor2d([paddedFrame], [1, frameSize]);
+        const inputTensor = tf.tensor2d([Array.from(paddedFrame)], [1, frameSize]);
         
         // Process with model
         const outputTensor = this.rnnNoiseModel.predict(inputTensor) as tf.Tensor;
@@ -162,9 +162,12 @@ export class AINoiseSuppressionProcessor {
         // Apply intensity scaling
         const intensity = settings.intensity / 100;
         
-        // Copy processed data back
+        // Copy processed data back - convert to Float32Array if needed
+        const processedArray = processedFrame instanceof Float32Array ? 
+          processedFrame : new Float32Array(processedFrame);
+        
         for (let j = 0; j < frame.length; j++) {
-          const processed = processedFrame[j] as number;
+          const processed = processedArray[j];
           const original = frame[j];
           outputData[i + j] = original * (1 - intensity) + processed * intensity;
         }
