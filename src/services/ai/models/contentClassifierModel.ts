@@ -1,6 +1,7 @@
+
 import { BaseModel } from './baseModel';
 import { TFJS_MODELS, HF_MODELS, MODEL_CONFIGS } from './modelTypes';
-import { pipeline, PipelineType } from '@huggingface/transformers';
+import { pipeline } from '@huggingface/transformers';
 import * as tf from '@tensorflow/tfjs';
 
 export class ContentClassifierModel extends BaseModel {
@@ -45,15 +46,19 @@ export class ContentClassifierModel extends BaseModel {
     try {
       console.log("Loading Whisper model for content classification...");
       
-      // Explicitly type the pipeline creation to avoid complex union types
-      const task: PipelineType = "automatic-speech-recognition";
-      const modelId = "onnx-community/whisper-tiny.en";
-      
+      // Simplify pipeline creation to avoid complex union types
       this.whisperPipeline = await this.retryOperation(async () => {
-        return await pipeline(task, modelId, {
-          device: this.useWebGPU ? 'webgpu' as const : 'cpu' as const,
-          dtype: this.useWebGPU ? 'fp16' as const : 'fp32' as const
-        });
+        if (this.useWebGPU) {
+          return await pipeline("automatic-speech-recognition", "onnx-community/whisper-tiny.en", {
+            device: "webgpu",
+            dtype: "fp16"
+          });
+        } else {
+          return await pipeline("automatic-speech-recognition", "onnx-community/whisper-tiny.en", {
+            device: "cpu",
+            dtype: "fp32"
+          });
+        }
       });
       
       if (this.whisperPipeline) {
