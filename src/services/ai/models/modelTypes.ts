@@ -9,7 +9,8 @@ export interface ModelStatus {
 // Processing mode options
 export enum ProcessingMode {
   LOCAL_WEBGPU = "local_webgpu",
-  LOCAL_CPU = "local_cpu", 
+  LOCAL_CPU = "local_cpu",
+  LOCAL_LIGHTWEIGHT = "local_lightweight", 
   REMOTE_API = "remote_api"
 }
 
@@ -35,6 +36,13 @@ export const TFJS_MODELS = {
   
   // Basic audio feature extractor
   AUDIO_FEATURES: "https://storage.googleapis.com/tfjs-models/tfjs/spice/2/model.json"
+};
+
+// Lightweight models for fallback processing
+export const LIGHTWEIGHT_MODELS = {
+  CONTENT_CLASSIFIER: "https://storage.googleapis.com/tfjs-models/tfjs/yamnet/tfjs/1/model.json",
+  NOISE_REDUCTION: "https://storage.googleapis.com/tfjs-models/tfjs/rnnoise/1/model.json",
+  ARTIFACT_DETECTOR: "https://storage.googleapis.com/tfjs-models/tfjs/spice/2/model.json"
 };
 
 // ONNX models for better performance (when available)

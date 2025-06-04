@@ -4,6 +4,7 @@ import { NoiseSuppressionModel } from './noiseSuppressionModel';
 import { ArtifactDetectionModel } from './artifactDetectionModel';
 import { WebGpuDetector } from './webGpuDetector';
 import { ProcessingMode } from './modelTypes';
+import { pipeline } from '@huggingface/transformers';
 import { toast } from "@/hooks/use-toast";
 
 // Main model manager that orchestrates all AI models
@@ -21,6 +22,24 @@ class ModelManager {
     
     // Initialize processing mode detection
     this.detectOptimalProcessingMode();
+  }
+  
+  // Load transformers model method
+  async loadTransformersModel(task: string, modelId: string, modelKey: string): Promise<any> {
+    try {
+      console.log(`Loading transformers model: ${modelId} for task: ${task}`);
+      
+      const pipeline_instance = await pipeline(task, modelId, {
+        device: this.preferredProcessingMode === ProcessingMode.LOCAL_WEBGPU ? 'webgpu' : 'cpu',
+        dtype: this.preferredProcessingMode === ProcessingMode.LOCAL_WEBGPU ? 'fp16' : 'fp32'
+      });
+      
+      console.log(`Successfully loaded transformers model: ${modelKey}`);
+      return pipeline_instance;
+    } catch (error) {
+      console.error(`Failed to load transformers model ${modelKey}:`, error);
+      throw error;
+    }
   }
   
   // Detect the optimal processing mode based on device capabilities

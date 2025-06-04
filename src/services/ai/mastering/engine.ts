@@ -152,8 +152,24 @@ export class AIAudioMasteringEngine {
               variant: "default"
             });
             
+            // Map strategy types to match the model's expected types
+            let mappedStrategy: 'auto' | 'rnnoise' | 'spectral' | 'wiener' = 'auto';
+            switch (settings.noiseReductionStrategy) {
+              case 'dtln':
+                mappedStrategy = 'rnnoise'; // Map DTLN to RNNoise
+                break;
+              case 'nsnet':
+                mappedStrategy = 'spectral'; // Map NSNet to spectral
+                break;
+              case 'hybrid':
+                mappedStrategy = 'wiener'; // Map hybrid to Wiener
+                break;
+              default:
+                mappedStrategy = settings.noiseReductionStrategy as 'auto' | 'spectral';
+            }
+            
             processedBuffer = await noiseSuppressor.processAudio(processedBuffer, {
-              strategy: settings.noiseReductionStrategy || 'auto',
+              strategy: mappedStrategy,
               intensity: settings.noiseReductionIntensity || 50,
               preserveTone: settings.preserveTone || true
             });
@@ -190,7 +206,7 @@ export class AIAudioMasteringEngine {
                 fixClipping: analysis.hasClipping,
                 fixCrackles: analysis.hasCrackles,
                 fixClicksAndPops: analysis.hasClicksAndPops,
-                fixDistortion: analysis.hasDistortion
+                fixDistortion: analysis.hasDistortion || false
               });
               
               toast({
