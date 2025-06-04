@@ -1,4 +1,3 @@
-
 import { BaseModel } from './baseModel';
 import { TFJS_MODELS, HF_MODELS, MODEL_CONFIGS } from './modelTypes';
 import { pipeline } from '@huggingface/transformers';
@@ -46,10 +45,10 @@ export class ContentClassifierModel extends BaseModel {
     try {
       console.log("Loading Whisper model for content classification...");
       
-      // Simplified pipeline options to avoid complex union type
+      // Properly typed pipeline options
       const pipelineOptions = {
-        device: this.useWebGPU ? 'webgpu' : 'cpu',
-        dtype: this.useWebGPU ? 'fp16' : 'fp32'
+        device: this.useWebGPU ? 'webgpu' as const : 'cpu' as const,
+        dtype: this.useWebGPU ? 'fp16' as const : 'fp32' as const
       };
       
       this.whisperPipeline = await this.retryOperation(async () => {
