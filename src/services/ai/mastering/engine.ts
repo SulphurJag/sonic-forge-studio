@@ -1,26 +1,20 @@
 
-import { AINoiseSuppressionProcessor } from '../noiseSuppressionProcessor';
-import { AIContentClassifier } from '../content/contentClassifier';
-import { AIArtifactEliminator } from '../artifactEliminator';
-import { initializeAIEngine, getInitializationStatus } from './initializeEngine';
-import { processAudioWithAI } from './processAudio';
+import { modelManager } from '../models';
+import { ProcessingMode } from '../models/modelTypes';
 import { AIAudioProcessingSettings, AIAudioProcessingResult, AIInitializationStatus } from './types';
-import { ProcessingMode, modelManager } from '../models';
+import { toast } from "@/hooks/use-toast";
 
-// Main AI Audio Processing Engine that combines all components
+// Main AI Audio Processing Engine with robust model management
 export class AIAudioMasteringEngine {
-  private noiseProcessor: AINoiseSuppressionProcessor;
-  private contentClassifier: AIContentClassifier;
-  private artifactEliminator: AIArtifactEliminator;
   private isInitialized: boolean = false;
   private isInitializing: boolean = false;
-  private hasGPUSupport: boolean = false;
-  private processingMode: ProcessingMode = ProcessingMode.REMOTE_API;
+  private initializationResult: { success: boolean; loadedModels: string[] } = { success: false, loadedModels: [] };
   
   constructor() {
-    this.noiseProcessor = new AINoiseSuppressionProcessor();
-    this.contentClassifier = new AIContentClassifier();
-    this.artifactEliminator = new AIArtifactEliminator();
+    // Auto-initialize in background
+    this.initialize().catch(error => {
+      console.warn("Background AI initialization failed:", error);
+    });
   }
   
   // Initialize all AI components
@@ -32,7 +26,7 @@ export class AIAudioMasteringEngine {
     if (this.isInitializing) {
       // Wait for existing initialization to complete
       let attempts = 0;
-      while (this.isInitializing && attempts < 50) {
+      while (this.isInitializing && attempts < 100) {
         await new Promise(resolve => setTimeout(resolve, 100));
         attempts++;
       }
@@ -42,25 +36,34 @@ export class AIAudioMasteringEngine {
     this.isInitializing = true;
     
     try {
-      const result = await initializeAIEngine(
-        this.noiseProcessor,
-        this.contentClassifier,
-        this.artifactEliminator,
-        this.isInitializing
-      );
+      console.log("Initializing AI Audio Mastering Engine...");
       
-      this.isInitialized = result.isInitialized;
-      this.hasGPUSupport = result.hasGPUSupport;
-      this.processingMode = result.processingMode;
+      // Initialize all models
+      this.initializationResult = await modelManager.initializeAllModels();
+      
+      // Consider initialization successful if at least one model loaded
+      this.isInitialized = this.initializationResult.success;
+      
+      if (this.isInitialized) {
+        toast({
+          title: "AI Engine Ready",
+          description: `Loaded ${this.initializationResult.loadedModels.length} AI models`,
+          variant: "default"
+        });
+        console.log("AI Audio Mastering Engine initialized successfully");
+      } else {
+        // Still mark as initialized to allow fallback processing
+        this.isInitialized = true;
+        console.log("AI Engine initialized with fallback processing");
+      }
+      
       this.isInitializing = false;
-      
       return this.isInitialized;
     } catch (error) {
       console.error('AI engine initialization failed:', error);
       this.isInitializing = false;
-      // Always fall back to remote API mode
-      this.processingMode = ProcessingMode.REMOTE_API;
-      this.isInitialized = true; // Consider remote API as "initialized"
+      // Always fall back to basic processing
+      this.isInitialized = true;
       return true;
     }
   }
@@ -72,25 +75,26 @@ export class AIAudioMasteringEngine {
   
   // Get the current processing mode
   getProcessingMode(): ProcessingMode {
-    return this.processingMode;
+    return modelManager.getPreferredProcessingMode();
   }
   
   // Set the processing mode explicitly
   setProcessingMode(mode: ProcessingMode): void {
-    this.processingMode = mode;
     modelManager.setProcessingMode(mode);
   }
   
   // Check initialization status of each component
   getInitializationStatus(): AIInitializationStatus {
-    return getInitializationStatus(
-      this.noiseProcessor,
-      this.contentClassifier,
-      this.artifactEliminator,
-      this.isInitialized,
-      this.hasGPUSupport,
-      this.processingMode
-    );
+    const status = modelManager.getModelStatusSummary();
+    
+    return {
+      noiseProcessor: status.noiseSuppressor,
+      contentClassifier: status.contentClassifier,
+      artifactEliminator: status.artifactDetector,
+      overall: this.isInitialized,
+      hasWebGPU: status.processingMode === ProcessingMode.LOCAL_WEBGPU,
+      processingMode: status.processingMode
+    };
   }
   
   // Process audio with all AI components
@@ -112,25 +116,127 @@ export class AIAudioMasteringEngine {
       }
     }
     
-    return processAudioWithAI(
-      audioBuffer,
-      settings,
-      this.noiseProcessor,
-      this.contentClassifier,
-      this.artifactEliminator,
-      this.isInitialized,
-      () => this.initialize()
-    );
+    let processedBuffer = audioBuffer;
+    let contentType: string[] = [];
+    let artifactsFound = false;
+    
+    try {
+      // Step 1: Content classification
+      if (settings.enableContentClassification) {
+        const classifier = modelManager.getContentClassifier();
+        if (classifier.isReady()) {
+          try {
+            contentType = await classifier.processAudio(audioBuffer);
+            console.log("Content classified as:", contentType);
+            
+            toast({
+              title: "Content Analysis Complete",
+              description: `Detected: ${contentType.join(', ')}`,
+              variant: "default"
+            });
+          } catch (error) {
+            console.warn("Content classification failed:", error);
+            contentType = ['audio']; // fallback
+          }
+        }
+      }
+      
+      // Step 2: Noise reduction
+      if (settings.enableNoiseReduction) {
+        const noiseSuppressor = modelManager.getNoiseSuppressor();
+        if (noiseSuppressor.isReady()) {
+          try {
+            toast({
+              title: "Noise Reduction Active",
+              description: `Using ${settings.noiseReductionStrategy} strategy`,
+              variant: "default"
+            });
+            
+            processedBuffer = await noiseSuppressor.processAudio(processedBuffer, {
+              strategy: settings.noiseReductionStrategy || 'auto',
+              intensity: settings.noiseReductionIntensity || 50,
+              preserveTone: settings.preserveTone || true
+            });
+            
+            toast({
+              title: "Noise Reduction Complete",
+              description: `Applied ${settings.noiseReductionIntensity}% intensity`,
+              variant: "default"
+            });
+          } catch (error) {
+            console.warn("Noise reduction failed:", error);
+          }
+        }
+      }
+      
+      // Step 3: Artifact elimination
+      if (settings.enableArtifactElimination) {
+        const artifactDetector = modelManager.getArtifactDetector();
+        if (artifactDetector.isReady()) {
+          try {
+            const analysis = await artifactDetector.detectArtifacts(processedBuffer);
+            artifactsFound = analysis.hasClipping || analysis.hasCrackles || analysis.hasClicksAndPops;
+            
+            if (artifactsFound) {
+              console.log("Artifacts detected:", analysis);
+              
+              toast({
+                title: "Artifacts Detected",
+                description: "Applying automatic corrections",
+                variant: "default"
+              });
+              
+              processedBuffer = await artifactDetector.fixArtifacts(processedBuffer, {
+                fixClipping: analysis.hasClipping,
+                fixCrackles: analysis.hasCrackles,
+                fixClicksAndPops: analysis.hasClicksAndPops,
+                fixDistortion: analysis.hasDistortion
+              });
+              
+              toast({
+                title: "Artifacts Fixed",
+                description: "Audio artifacts have been corrected",
+                variant: "default"
+              });
+            }
+          } catch (error) {
+            console.warn("Artifact detection/fixing failed:", error);
+          }
+        }
+      }
+      
+      return {
+        processedBuffer,
+        contentType,
+        artifactsFound
+      };
+    } catch (error) {
+      console.error("Error during AI audio processing:", error);
+      
+      toast({
+        title: "Processing Error",
+        description: "AI processing encountered an error",
+        variant: "destructive"
+      });
+      
+      return {
+        processedBuffer: audioBuffer,
+        contentType: contentType || [],
+        artifactsFound: false
+      };
+    }
+  }
+  
+  // Get loaded models info
+  getLoadedModels(): string[] {
+    return this.initializationResult.loadedModels;
   }
   
   // Dispose of resources
   dispose(): void {
     this.isInitialized = false;
     this.isInitializing = false;
-    
-    // Dispose model manager resources
     modelManager.dispose();
-    
     console.log("AI Audio Mastering Engine disposed");
   }
 }

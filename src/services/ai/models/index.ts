@@ -1,36 +1,25 @@
 
-import { ModelStatusTracker } from './modelStatusTracker';
-import { OnnxModelLoader } from './onnxModelLoader';
-import { TensorflowModelLoader } from './tensorflowModelLoader';
-import { TransformersModelLoader } from './transformersModelLoader';
+import { ContentClassifierModel } from './contentClassifierModel';
+import { NoiseSuppressionModel } from './noiseSuppressionModel';
+import { ArtifactDetectionModel } from './artifactDetectionModel';
 import { WebGpuDetector } from './webGpuDetector';
-import { huggingFaceSpacesAPI } from './hugginFaceSpacesAPI';
-import { MODEL_PATHS, HF_MODELS, LIGHTWEIGHT_MODELS, ModelStatus, ProcessingMode, HF_SPACES_ENDPOINTS } from './modelTypes';
+import { ProcessingMode } from './modelTypes';
 import { toast } from "@/hooks/use-toast";
 
-// Main model manager that combines all loaders
+// Main model manager that orchestrates all AI models
 class ModelManager {
-  private statusTracker: ModelStatusTracker;
-  private onnxLoader: OnnxModelLoader;
-  private tfLoader: TensorflowModelLoader;
-  private transformersLoader: TransformersModelLoader;
+  private contentClassifier: ContentClassifierModel;
+  private noiseSuppressor: NoiseSuppressionModel;
+  private artifactDetector: ArtifactDetectionModel;
   private preferredProcessingMode: ProcessingMode = ProcessingMode.REMOTE_API;
   private isInitialized: boolean = false;
   
   constructor() {
-    // Initialize model status tracker with all model keys
-    const allModelKeys = [
-      ...Object.keys(MODEL_PATHS),
-      ...Object.keys(HF_MODELS),
-      ...Object.keys(HF_SPACES_ENDPOINTS)
-    ];
+    this.contentClassifier = new ContentClassifierModel();
+    this.noiseSuppressor = new NoiseSuppressionModel();
+    this.artifactDetector = new ArtifactDetectionModel();
     
-    this.statusTracker = new ModelStatusTracker(allModelKeys);
-    this.onnxLoader = new OnnxModelLoader(this.statusTracker);
-    this.tfLoader = new TensorflowModelLoader(this.statusTracker);
-    this.transformersLoader = new TransformersModelLoader(this.statusTracker);
-    
-    // Determine preferred processing mode
+    // Initialize processing mode detection
     this.detectOptimalProcessingMode();
   }
   
@@ -45,14 +34,8 @@ class ModelManager {
         this.preferredProcessingMode = ProcessingMode.LOCAL_WEBGPU;
         console.log("Using WebGPU for local model processing");
       } else {
-        this.preferredProcessingMode = ProcessingMode.REMOTE_API;
-        console.log("Using remote API for model processing");
-        
-        toast({
-          title: "Using Remote Processing",
-          description: "Your device doesn't support WebGPU. Using cloud-based processing.",
-          variant: "default"
-        });
+        this.preferredProcessingMode = ProcessingMode.LOCAL_CPU;
+        console.log("Using CPU for local model processing");
       }
       
       this.isInitialized = true;
@@ -63,84 +46,107 @@ class ModelManager {
     }
   }
   
-  // Get the preferred processing mode
+  // Initialize all models
+  async initializeAllModels(): Promise<{ success: boolean; loadedModels: string[] }> {
+    const loadedModels: string[] = [];
+    
+    try {
+      // Initialize models in parallel
+      const [contentResult, noiseResult, artifactResult] = await Promise.allSettled([
+        this.contentClassifier.loadModel(),
+        this.noiseSuppressor.loadModel(),
+        this.artifactDetector.loadModel()
+      ]);
+      
+      if (contentResult.status === 'fulfilled' && contentResult.value) {
+        loadedModels.push('ContentClassifier');
+      }
+      
+      if (noiseResult.status === 'fulfilled' && noiseResult.value) {
+        loadedModels.push('NoiseSuppressor');
+      }
+      
+      if (artifactResult.status === 'fulfilled' && artifactResult.value) {
+        loadedModels.push('ArtifactDetector');
+      }
+      
+      const success = loadedModels.length > 0;
+      
+      if (success) {
+        toast({
+          title: "AI Models Loaded",
+          description: `Successfully loaded: ${loadedModels.join(', ')}`,
+          variant: "default"
+        });
+      } else {
+        toast({
+          title: "Model Loading Failed",
+          description: "Using fallback processing methods",
+          variant: "destructive"
+        });
+      }
+      
+      return { success, loadedModels };
+    } catch (error) {
+      console.error("Error initializing models:", error);
+      return { success: false, loadedModels };
+    }
+  }
+  
+  // Get model instances
+  getContentClassifier(): ContentClassifierModel {
+    return this.contentClassifier;
+  }
+  
+  getNoiseSuppressor(): NoiseSuppressionModel {
+    return this.noiseSuppressor;
+  }
+  
+  getArtifactDetector(): ArtifactDetectionModel {
+    return this.artifactDetector;
+  }
+  
+  // Get processing mode
   getPreferredProcessingMode(): ProcessingMode {
     return this.preferredProcessingMode;
   }
   
-  // Set processing mode explicitly
   setProcessingMode(mode: ProcessingMode): void {
     this.preferredProcessingMode = mode;
   }
   
-  // Check if a model is ready for inference
-  isModelReady(modelKey: string): boolean {
-    return this.statusTracker.isModelReady(modelKey);
-  }
-  
-  // Get model loading status
-  getModelStatus(modelKey: string): ModelStatus {
-    return this.statusTracker.getModelStatus(modelKey);
-  }
-  
-  // Load an ONNX model
-  async loadOnnxModel(modelKey: string): Promise<any | null> {
-    const modelPath = (MODEL_PATHS as any)[modelKey];
-    if (!modelPath) {
-      console.error(`Model path not found for key: ${modelKey}`);
-      return null;
-    }
-    
-    return this.onnxLoader.loadModel(modelKey, modelPath);
-  }
-  
-  // Load a TensorFlow.js model
-  async loadTfModel(modelKey: string): Promise<any | null> {
-    const modelPath = (LIGHTWEIGHT_MODELS as any)[modelKey];
-    if (!modelPath) {
-      console.error(`Model path not found for key: ${modelKey}`);
-      return null;
-    }
-    
-    return this.tfLoader.loadModel(modelKey, modelPath);
-  }
-  
-  // Load a Hugging Face Transformers model
-  async loadTransformersModel(
-    task: "feature-extraction" | "text-classification" | "token-classification" | 
-          "question-answering" | "summarization" | "translation" | 
-          "text-generation" | "fill-mask" | 
-          "image-classification" | "image-segmentation" | 
-          "object-detection" | "image-to-text" | "automatic-speech-recognition" | 
-          "audio-classification" | "text-to-speech" | "zero-shot-classification",
-    modelId: string,
-    modelKey: string
-  ): Promise<any> {
-    return this.transformersLoader.loadModel(task, modelId, modelKey);
-  }
-  
-  // Check if browser supports WebGPU
+  // Check WebGPU support
   async checkWebGPUSupport(): Promise<boolean> {
     return WebGpuDetector.isWebGpuSupported();
   }
   
-  // Get API for Hugging Face Spaces
-  getHuggingFaceSpacesAPI() {
-    return huggingFaceSpacesAPI;
+  // Get model status summary
+  getModelStatusSummary(): {
+    contentClassifier: boolean;
+    noiseSuppressor: boolean;
+    artifactDetector: boolean;
+    processingMode: ProcessingMode;
+  } {
+    return {
+      contentClassifier: this.contentClassifier.isReady(),
+      noiseSuppressor: this.noiseSuppressor.isReady(),
+      artifactDetector: this.artifactDetector.isReady(),
+      processingMode: this.preferredProcessingMode
+    };
   }
   
-  // Dispose of all models to free memory
+  // Dispose all models
   dispose(): void {
-    this.onnxLoader.disposeAll();
-    this.tfLoader.disposeAll();
-    this.transformersLoader.disposeAll();
+    this.contentClassifier.dispose();
+    this.noiseSuppressor.dispose();
+    this.artifactDetector.dispose();
     console.log("All AI models disposed");
   }
 }
 
-// Export model types and constants
-export { MODEL_PATHS, HF_MODELS, LIGHTWEIGHT_MODELS, HF_SPACES_ENDPOINTS, ProcessingMode };
-export type { ModelStatus };
-
 // Export the model manager instance
 export const modelManager = new ModelManager();
+
+// Re-export types and constants
+export * from './modelTypes';
+export { WebGpuDetector } from './webGpuDetector';
