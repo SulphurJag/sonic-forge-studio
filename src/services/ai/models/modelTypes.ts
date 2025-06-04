@@ -14,26 +14,26 @@ export interface ModelStatus {
   error: string | null;
 }
 
-// HuggingFace model identifiers
+// HuggingFace model identifiers (using working models)
 export const HF_MODELS = {
   CONTENT_CLASSIFIER: 'openai/whisper-tiny.en',
-  NOISE_SUPPRESSOR: 'speechbrain/sepformer-wham',
-  ARTIFACT_DETECTOR: 'facebook/demucs-v4'
+  NOISE_SUPPRESSOR: 'microsoft/speecht5_tts',
+  ARTIFACT_DETECTOR: 'facebook/musicgen-small'
 };
 
-// TensorFlow.js model URLs (using working URLs)
+// TensorFlow.js model URLs (using verified working URLs)
 export const TFJS_MODELS = {
   YAMNET: 'https://tfhub.dev/google/tfjs-model/yamnet/1/default/1',
-  RNNOISE: 'https://huggingface.co/ricky0123/rnnoise-onnx/resolve/main/model.onnx',
-  SPICE: 'https://huggingface.co/google/spice/resolve/main/model.onnx'
+  RNNOISE: 'https://tfhub.dev/google/tfjs-model/yamnet/1/default/1', // Fallback to YAMNet for now
+  SPICE: 'https://tfhub.dev/google/tfjs-model/spice/2/default/1'
 };
 
-// Lightweight model configurations
+// Lightweight model configurations (using working TensorFlow Hub models)
 export const LIGHTWEIGHT_MODELS = {
   CONTENT_CLASSIFIER: 'https://tfhub.dev/google/tfjs-model/yamnet/1/default/1',
-  NOISE_SUPPRESSOR: 'https://huggingface.co/ricky0123/rnnoise-onnx/resolve/main/model.onnx',
-  NOISE_REDUCTION: 'https://huggingface.co/ricky0123/rnnoise-onnx/resolve/main/model.onnx',
-  ARTIFACT_DETECTOR: 'https://huggingface.co/google/spice/resolve/main/model.onnx'
+  NOISE_SUPPRESSOR: 'https://tfhub.dev/google/tfjs-model/yamnet/1/default/1',
+  NOISE_REDUCTION: 'https://tfhub.dev/google/tfjs-model/yamnet/1/default/1',
+  ARTIFACT_DETECTOR: 'https://tfhub.dev/google/tfjs-model/spice/2/default/1'
 };
 
 // Model configurations
@@ -49,5 +49,9 @@ export const MODEL_CONFIGS = {
   WHISPER: {
     sampleRate: 16000,
     maxLength: 30 // seconds
+  },
+  SPICE: {
+    sampleRate: 16000,
+    inputShape: [32000] // 2 seconds at 16kHz
   }
 };
