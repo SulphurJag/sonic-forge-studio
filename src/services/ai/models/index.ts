@@ -3,7 +3,7 @@ import { ContentClassifierModel } from './contentClassifierModel';
 import { NoiseSuppressionModel } from './noiseSuppressionModel';
 import { ArtifactDetectionModel } from './artifactDetectionModel';
 import { WebGpuDetector } from './webGpuDetector';
-import { ProcessingMode } from './modelTypes';
+import { ProcessingMode, HF_MODELS, TFJS_MODELS, LIGHTWEIGHT_MODELS } from './modelTypes';
 import { pipeline, PipelineType } from '@huggingface/transformers';
 import { toast } from "@/hooks/use-toast";
 
@@ -172,3 +172,4 @@ export const modelManager = new ModelManager();
 // Re-export types and constants
 export * from './modelTypes';
 export { WebGpuDetector } from './webGpuDetector';
+export { HF_MODELS, TFJS_MODELS, LIGHTWEIGHT_MODELS };
