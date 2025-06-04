@@ -42,6 +42,11 @@ export class ArtifactDetectionModel extends BaseModel {
       return true;
     }
   }
+
+  // Implement the required processAudio method from BaseModel
+  async processAudio(audioBuffer: AudioBuffer, options?: any): Promise<ArtifactAnalysis> {
+    return this.detectArtifacts(audioBuffer);
+  }
   
   private async loadAudioAnalysisModel(): Promise<boolean> {
     try {

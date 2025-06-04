@@ -46,15 +46,17 @@ export class ContentClassifierModel extends BaseModel {
     try {
       console.log("Loading Whisper model for content classification...");
       
+      // Simplified pipeline options to avoid complex union type
+      const pipelineOptions = {
+        device: this.useWebGPU ? 'webgpu' : 'cpu',
+        dtype: this.useWebGPU ? 'fp16' : 'fp32'
+      };
+      
       this.whisperPipeline = await this.retryOperation(async () => {
         return await pipeline(
-          MODEL_CONFIGS.WHISPER.task,
-          MODEL_CONFIGS.WHISPER.model_id,
-          {
-            device: this.useWebGPU ? 'webgpu' : 'cpu',
-            dtype: this.useWebGPU ? 'fp16' : 'fp32',
-            model_file_name: 'onnx/model_quantized.onnx'
-          }
+          "automatic-speech-recognition",
+          "onnx-community/whisper-tiny.en",
+          pipelineOptions
         );
       });
       
