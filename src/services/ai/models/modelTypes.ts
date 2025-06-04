@@ -31,7 +31,9 @@ export const TFJS_MODELS = {
 // Lightweight model configurations
 export const LIGHTWEIGHT_MODELS = {
   CONTENT_CLASSIFIER: 'https://tfhub.dev/google/tfjs-model/yamnet/1/default/1',
-  NOISE_SUPPRESSOR: 'https://huggingface.co/ricky0123/rnnoise-onnx/resolve/main/model.onnx'
+  NOISE_SUPPRESSOR: 'https://huggingface.co/ricky0123/rnnoise-onnx/resolve/main/model.onnx',
+  NOISE_REDUCTION: 'https://huggingface.co/ricky0123/rnnoise-onnx/resolve/main/model.onnx',
+  ARTIFACT_DETECTOR: 'https://huggingface.co/google/spice/resolve/main/model.onnx'
 };
 
 // Model configurations
