@@ -1,4 +1,3 @@
-
 import { BaseModel } from './baseModel';
 import { TFJS_MODELS, HF_MODELS, MODEL_CONFIGS } from './modelTypes';
 import { pipeline } from '@huggingface/transformers';
@@ -46,22 +45,29 @@ export class ContentClassifierModel extends BaseModel {
     try {
       console.log("Loading Whisper model for content classification...");
       
-      // Simplify pipeline creation to avoid complex union types
-      this.whisperPipeline = await this.retryOperation(async () => {
-        if (this.useWebGPU) {
-          return await pipeline("automatic-speech-recognition", "onnx-community/whisper-tiny.en", {
+      // Create pipeline directly to avoid complex union types
+      let pipelineInstance: any = null;
+      
+      if (this.useWebGPU) {
+        try {
+          pipelineInstance = await pipeline("automatic-speech-recognition", "onnx-community/whisper-tiny.en", {
             device: "webgpu",
             dtype: "fp16"
           });
-        } else {
-          return await pipeline("automatic-speech-recognition", "onnx-community/whisper-tiny.en", {
-            device: "cpu",
-            dtype: "fp32"
-          });
+        } catch (webgpuError) {
+          console.warn("WebGPU failed, falling back to CPU:", webgpuError);
         }
-      });
+      }
       
-      if (this.whisperPipeline) {
+      if (!pipelineInstance) {
+        pipelineInstance = await pipeline("automatic-speech-recognition", "onnx-community/whisper-tiny.en", {
+          device: "cpu",
+          dtype: "fp32"
+        });
+      }
+      
+      if (pipelineInstance) {
+        this.whisperPipeline = pipelineInstance;
         console.log("Whisper model loaded successfully");
         return true;
       }
