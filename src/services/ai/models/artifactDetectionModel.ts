@@ -1,4 +1,3 @@
-
 import { BaseModel } from './baseModel';
 import { TFJS_MODELS, MODEL_CONFIGS, LIGHTWEIGHT_MODELS } from './modelTypes';
 import { AudioResamplingUtils } from './utils/audioResamplingUtils';
@@ -10,6 +9,12 @@ export class ArtifactDetectionModel extends BaseModel {
   
   constructor() {
     super('ArtifactDetection');
+  }
+  
+  // Implement required processAudio method from BaseModel
+  async processAudio(audioBuffer: AudioBuffer): Promise<AudioBuffer> {
+    // For artifact detection, we don't modify the audio, just detect issues
+    return audioBuffer;
   }
   
   async loadModel(): Promise<boolean> {
@@ -135,8 +140,8 @@ export class ArtifactDetectionModel extends BaseModel {
   
   private interpretSpiceOutput(spiceData: any, startTime: number, endTime: number): any {
     // SPICE outputs pitch confidence - low confidence might indicate artifacts
-    const confidence = Array.from(spiceData);
-    const avgConfidence = confidence.reduce((a: number, b: number) => a + b, 0) / confidence.length;
+    const confidence = Array.from(spiceData) as number[];
+    const avgConfidence = confidence.reduce((a, b) => a + b, 0) / confidence.length;
     
     const result = {
       hasClipping: false,
@@ -164,8 +169,8 @@ export class ArtifactDetectionModel extends BaseModel {
       
       if (diff > 0.5) {
         result.hasClicksAndPops = true;
-        const segmentStart = startTime + (i - 1) / confidence.length * (endTime - startTime);
-        const segmentEnd = startTime + (i + 1) / confidence.length * (endTime - startTime);
+        const segmentStart = startTime + ((i - 1) / confidence.length) * (endTime - startTime);
+        const segmentEnd = startTime + ((i + 1) / confidence.length) * (endTime - startTime);
         result.segments.push({
           start: segmentStart,
           end: segmentEnd,
@@ -323,8 +328,8 @@ export class ArtifactDetectionModel extends BaseModel {
       if (Math.abs(chunk[i]) > 0.95) {
         hasArtifacts = true;
         segments.push({
-          start: startTime + i / chunk.length * 0.1,
-          end: startTime + (i + 10) / chunk.length * 0.1,
+          start: startTime + (i / chunk.length) * 0.1,
+          end: startTime + ((i + 10) / chunk.length) * 0.1,
           type: 'clipping'
         });
         break;
