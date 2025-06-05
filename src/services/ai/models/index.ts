@@ -2,6 +2,8 @@
 import { ContentClassifierModel } from './contentClassifierModel';
 import { NoiseSuppressionModel } from './noiseSuppressionModel';
 import { ArtifactDetectionModel } from './artifactDetectionModel';
+import { RealNoiseReductionModel } from './realNoiseReductionModel';
+import { RealArtifactDetectionModel } from './realArtifactDetectionModel';
 import { WebGpuDetector } from './webGpuDetector';
 import { ProcessingMode, HF_MODELS, TFJS_MODELS, LIGHTWEIGHT_MODELS } from './modelTypes';
 import { pipeline, PipelineType } from '@huggingface/transformers';
@@ -12,6 +14,8 @@ class ModelManager {
   private contentClassifier: ContentClassifierModel;
   private noiseSuppressor: NoiseSuppressionModel;
   private artifactDetector: ArtifactDetectionModel;
+  private realNoiseReducer: RealNoiseReductionModel;
+  private realArtifactDetector: RealArtifactDetectionModel;
   private preferredProcessingMode: ProcessingMode = ProcessingMode.REMOTE_API;
   private isInitialized: boolean = false;
   
@@ -19,6 +23,8 @@ class ModelManager {
     this.contentClassifier = new ContentClassifierModel();
     this.noiseSuppressor = new NoiseSuppressionModel();
     this.artifactDetector = new ArtifactDetectionModel();
+    this.realNoiseReducer = new RealNoiseReductionModel();
+    this.realArtifactDetector = new RealArtifactDetectionModel();
     
     // Initialize processing mode detection
     this.detectOptimalProcessingMode();
@@ -68,28 +74,28 @@ class ModelManager {
     }
   }
   
-  // Initialize all models
+  // Initialize all models (using real AI models)
   async initializeAllModels(): Promise<{ success: boolean; loadedModels: string[] }> {
     const loadedModels: string[] = [];
     
     try {
-      // Initialize models in parallel
-      const [contentResult, noiseResult, artifactResult] = await Promise.allSettled([
+      // Initialize models in parallel (prioritize real AI models)
+      const [contentResult, realNoiseResult, realArtifactResult] = await Promise.allSettled([
         this.contentClassifier.loadModel(),
-        this.noiseSuppressor.loadModel(),
-        this.artifactDetector.loadModel()
+        this.realNoiseReducer.loadModel(),
+        this.realArtifactDetector.loadModel()
       ]);
       
       if (contentResult.status === 'fulfilled' && contentResult.value) {
         loadedModels.push('ContentClassifier');
       }
       
-      if (noiseResult.status === 'fulfilled' && noiseResult.value) {
-        loadedModels.push('NoiseSuppressor');
+      if (realNoiseResult.status === 'fulfilled' && realNoiseResult.value) {
+        loadedModels.push('RealNoiseReduction');
       }
       
-      if (artifactResult.status === 'fulfilled' && artifactResult.value) {
-        loadedModels.push('ArtifactDetector');
+      if (realArtifactResult.status === 'fulfilled' && realArtifactResult.value) {
+        loadedModels.push('RealArtifactDetection');
       }
       
       const success = loadedModels.length > 0;
@@ -115,16 +121,25 @@ class ModelManager {
     }
   }
   
-  // Get model instances
+  // Get model instances (prioritize real AI models)
   getContentClassifier(): ContentClassifierModel {
     return this.contentClassifier;
   }
   
-  getNoiseSuppressor(): NoiseSuppressionModel {
+  getNoiseSuppressor(): RealNoiseReductionModel {
+    return this.realNoiseReducer;
+  }
+  
+  getArtifactDetector(): RealArtifactDetectionModel {
+    return this.realArtifactDetector;
+  }
+  
+  // Legacy methods for backward compatibility
+  getLegacyNoiseSuppressor(): NoiseSuppressionModel {
     return this.noiseSuppressor;
   }
   
-  getArtifactDetector(): ArtifactDetectionModel {
+  getLegacyArtifactDetector(): ArtifactDetectionModel {
     return this.artifactDetector;
   }
   
@@ -142,7 +157,7 @@ class ModelManager {
     return WebGpuDetector.isWebGpuSupported();
   }
   
-  // Get model status summary
+  // Get model status summary (using real AI models)
   getModelStatusSummary(): {
     contentClassifier: boolean;
     noiseSuppressor: boolean;
@@ -151,8 +166,8 @@ class ModelManager {
   } {
     return {
       contentClassifier: this.contentClassifier.isReady(),
-      noiseSuppressor: this.noiseSuppressor.isReady(),
-      artifactDetector: this.artifactDetector.isReady(),
+      noiseSuppressor: this.realNoiseReducer.isReady(),
+      artifactDetector: this.realArtifactDetector.isReady(),
       processingMode: this.preferredProcessingMode
     };
   }
@@ -162,6 +177,8 @@ class ModelManager {
     this.contentClassifier.dispose();
     this.noiseSuppressor.dispose();
     this.artifactDetector.dispose();
+    this.realNoiseReducer.dispose();
+    this.realArtifactDetector.dispose();
     console.log("All AI models disposed");
   }
 }
@@ -173,3 +190,5 @@ export const modelManager = new ModelManager();
 export * from './modelTypes';
 export { WebGpuDetector } from './webGpuDetector';
 export { HF_MODELS, TFJS_MODELS, LIGHTWEIGHT_MODELS };
+export { RealNoiseReductionModel } from './realNoiseReductionModel';
+export { RealArtifactDetectionModel } from './realArtifactDetectionModel';

@@ -17,7 +17,7 @@ export interface ModelStatus {
 // Working HuggingFace model identifiers (verified working models)
 export const HF_MODELS = {
   CONTENT_CLASSIFIER: 'Xenova/whisper-tiny.en',
-  NOISE_SUPPRESSOR: 'Xenova/speecht5_tts',
+  NOISE_SUPPRESSOR: 'Xenova/rnnoise',
   ARTIFACT_DETECTOR: 'Xenova/wav2vec2-large-960h-lv60-self'
 };
 
@@ -25,14 +25,15 @@ export const HF_MODELS = {
 export const TFJS_MODELS = {
   YAMNET: 'https://storage.googleapis.com/tfhub-tfjs-modules/google/yamnet/tfjs/1/default/1/model.json',
   SPICE: 'https://storage.googleapis.com/tfhub-tfjs-modules/google/spice/tfjs/2/default/1/model.json',
-  RNNOISE: 'https://storage.googleapis.com/tfhub-tfjs-modules/google/universal-sentence-encoder/tfjs/1/default/1/model.json'
+  RNNOISE: 'https://storage.googleapis.com/tfhub-tfjs-modules/google/universal-sentence-encoder/tfjs/1/default/1/model.json',
+  NSNET: 'https://storage.googleapis.com/tfhub-tfjs-modules/microsoft/nsnet2/tfjs/1/default/1/model.json'
 };
 
 // Lightweight model configurations using working CDN URLs
 export const LIGHTWEIGHT_MODELS = {
   CONTENT_CLASSIFIER: 'https://storage.googleapis.com/tfhub-tfjs-modules/google/yamnet/tfjs/1/default/1/model.json',
-  NOISE_SUPPRESSOR: 'https://storage.googleapis.com/tfhub-tfjs-modules/google/yamnet/tfjs/1/default/1/model.json',
-  NOISE_REDUCTION: 'https://storage.googleapis.com/tfhub-tfjs-modules/google/yamnet/tfjs/1/default/1/model.json',
+  NOISE_SUPPRESSOR: 'https://storage.googleapis.com/tfhub-tfjs-modules/google/universal-sentence-encoder/tfjs/1/default/1/model.json',
+  NOISE_REDUCTION: 'https://storage.googleapis.com/tfhub-tfjs-modules/google/universal-sentence-encoder/tfjs/1/default/1/model.json',
   ARTIFACT_DETECTOR: 'https://storage.googleapis.com/tfhub-tfjs-modules/google/spice/tfjs/2/default/1/model.json'
 };
 
@@ -47,6 +48,11 @@ export const MODEL_CONFIGS = {
     sampleRate: 48000,
     frameSize: 480,
     inputShape: [480]
+  },
+  NSNET: {
+    sampleRate: 16000,
+    frameSize: 320,
+    inputShape: [320]
   },
   WHISPER: {
     sampleRate: 16000,
@@ -73,3 +79,12 @@ export const YAMNET_CLASSES = [
   'Bass guitar',
   'Electronic music'
 ];
+
+// Noise reduction strategies
+export const NOISE_REDUCTION_STRATEGIES = {
+  AUTO: 'auto',
+  RNNOISE: 'rnnoise',
+  NSNET: 'nsnet',
+  SPECTRAL: 'spectral',
+  WIENER: 'wiener'
+};
