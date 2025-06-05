@@ -16,24 +16,24 @@ export interface ModelStatus {
 
 // Working HuggingFace model identifiers (verified working models)
 export const HF_MODELS = {
-  CONTENT_CLASSIFIER: 'openai/whisper-tiny.en',
-  NOISE_SUPPRESSOR: 'microsoft/speecht5_tts',
-  ARTIFACT_DETECTOR: 'facebook/musicgen-small'
+  CONTENT_CLASSIFIER: 'Xenova/whisper-tiny.en',
+  NOISE_SUPPRESSOR: 'Xenova/speecht5_tts',
+  ARTIFACT_DETECTOR: 'Xenova/wav2vec2-large-960h-lv60-self'
 };
 
-// Working TensorFlow.js model URLs (verified working models)
+// Working TensorFlow.js model URLs (verified working models from official TF Hub)
 export const TFJS_MODELS = {
-  YAMNET: 'https://tfhub.dev/google/tfjs-model/yamnet/1/default/1',
-  SPICE: 'https://tfhub.dev/google/tfjs-model/spice/2/default/1',
-  RNNOISE: 'https://cdn.jsdelivr.net/npm/@tensorflow-models/universal-sentence-encoder@1.3.3/dist/model.json'
+  YAMNET: 'https://storage.googleapis.com/tfhub-tfjs-modules/google/yamnet/tfjs/1/default/1/model.json',
+  SPICE: 'https://storage.googleapis.com/tfhub-tfjs-modules/google/spice/tfjs/2/default/1/model.json',
+  RNNOISE: 'https://storage.googleapis.com/tfhub-tfjs-modules/google/universal-sentence-encoder/tfjs/1/default/1/model.json'
 };
 
 // Lightweight model configurations using working CDN URLs
 export const LIGHTWEIGHT_MODELS = {
-  CONTENT_CLASSIFIER: 'https://tfhub.dev/google/tfjs-model/yamnet/1/default/1',
-  NOISE_SUPPRESSOR: 'https://tfhub.dev/google/tfjs-model/yamnet/1/default/1',
-  NOISE_REDUCTION: 'https://tfhub.dev/google/tfjs-model/yamnet/1/default/1',
-  ARTIFACT_DETECTOR: 'https://tfhub.dev/google/tfjs-model/spice/2/default/1'
+  CONTENT_CLASSIFIER: 'https://storage.googleapis.com/tfhub-tfjs-modules/google/yamnet/tfjs/1/default/1/model.json',
+  NOISE_SUPPRESSOR: 'https://storage.googleapis.com/tfhub-tfjs-modules/google/yamnet/tfjs/1/default/1/model.json',
+  NOISE_REDUCTION: 'https://storage.googleapis.com/tfhub-tfjs-modules/google/yamnet/tfjs/1/default/1/model.json',
+  ARTIFACT_DETECTOR: 'https://storage.googleapis.com/tfhub-tfjs-modules/google/spice/tfjs/2/default/1/model.json'
 };
 
 // Model configurations with proper input shapes

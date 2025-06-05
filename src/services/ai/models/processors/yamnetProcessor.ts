@@ -8,7 +8,14 @@ export class YAMNetProcessor {
 
   async initialize(): Promise<boolean> {
     try {
-      console.log("Loading YAMNet model...");
+      console.log("Loading YAMNet model from:", TFJS_MODELS.YAMNET);
+      
+      // Test if the URL is accessible first
+      const response = await fetch(TFJS_MODELS.YAMNET);
+      if (!response.ok) {
+        console.error("YAMNet model URL not accessible:", response.status, response.statusText);
+        return false;
+      }
       
       this.model = await tf.loadGraphModel(TFJS_MODELS.YAMNET);
       

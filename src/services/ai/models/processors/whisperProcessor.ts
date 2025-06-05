@@ -6,11 +6,13 @@ export class WhisperProcessor {
   private pipeline: any = null;
   private useWebGPU: boolean = false;
 
-  constructor(useWebGPU: boolean = false) {
-    this.useWebGPU = useWebGPU;
+  constructor() {
+    this.useWebGPU = false;
   }
 
-  async initialize(): Promise<boolean> {
+  async initialize(useWebGPU: boolean = false): Promise<boolean> {
+    this.useWebGPU = useWebGPU;
+    
     try {
       console.log("Loading Whisper model for content classification...");
       

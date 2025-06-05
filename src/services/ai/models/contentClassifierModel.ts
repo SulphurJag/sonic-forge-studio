@@ -27,7 +27,7 @@ export class ContentClassifierModel extends BaseModel {
       let whisperLoaded = false;
       
       if (this.useWebGPU) {
-        whisperLoaded = await this.whisperProcessor.initialize(this.useWebGPU);
+        whisperLoaded = await this.whisperProcessor.initialize();
       }
       
       if (yamnetLoaded || whisperLoaded) {
