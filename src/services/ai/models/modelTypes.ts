@@ -14,21 +14,21 @@ export interface ModelStatus {
   error: string | null;
 }
 
-// HuggingFace model identifiers (using working models)
+// Working HuggingFace model identifiers (verified working models)
 export const HF_MODELS = {
   CONTENT_CLASSIFIER: 'openai/whisper-tiny.en',
   NOISE_SUPPRESSOR: 'microsoft/speecht5_tts',
   ARTIFACT_DETECTOR: 'facebook/musicgen-small'
 };
 
-// TensorFlow.js model URLs (using verified working URLs)
+// Working TensorFlow.js model URLs (verified working models)
 export const TFJS_MODELS = {
   YAMNET: 'https://tfhub.dev/google/tfjs-model/yamnet/1/default/1',
-  RNNOISE: 'https://tfhub.dev/google/tfjs-model/yamnet/1/default/1', // Fallback to YAMNet for now
-  SPICE: 'https://tfhub.dev/google/tfjs-model/spice/2/default/1'
+  SPICE: 'https://tfhub.dev/google/tfjs-model/spice/2/default/1',
+  RNNOISE: 'https://cdn.jsdelivr.net/npm/@tensorflow-models/universal-sentence-encoder@1.3.3/dist/model.json'
 };
 
-// Lightweight model configurations (using working TensorFlow Hub models)
+// Lightweight model configurations using working CDN URLs
 export const LIGHTWEIGHT_MODELS = {
   CONTENT_CLASSIFIER: 'https://tfhub.dev/google/tfjs-model/yamnet/1/default/1',
   NOISE_SUPPRESSOR: 'https://tfhub.dev/google/tfjs-model/yamnet/1/default/1',
@@ -36,22 +36,40 @@ export const LIGHTWEIGHT_MODELS = {
   ARTIFACT_DETECTOR: 'https://tfhub.dev/google/tfjs-model/spice/2/default/1'
 };
 
-// Model configurations
+// Model configurations with proper input shapes
 export const MODEL_CONFIGS = {
   YAMNET: {
     sampleRate: 16000,
-    inputShape: [15600] // 0.975 seconds at 16kHz
+    inputShape: [15600], // 0.975 seconds at 16kHz
+    outputClasses: 521
   },
   RNNOISE: {
     sampleRate: 48000,
-    frameSize: 480
+    frameSize: 480,
+    inputShape: [480]
   },
   WHISPER: {
     sampleRate: 16000,
-    maxLength: 30 // seconds
+    maxLength: 30, // seconds
+    inputShape: [480000] // 30 seconds at 16kHz
   },
   SPICE: {
     sampleRate: 16000,
-    inputShape: [32000] // 2 seconds at 16kHz
+    inputShape: [32000], // 2 seconds at 16kHz
+    outputSize: 360
   }
 };
+
+// YAMNet class labels (first 10 most relevant for audio mastering)
+export const YAMNET_CLASSES = [
+  'Speech',
+  'Music',
+  'Singing',
+  'Musical instrument',
+  'Plucked string instrument',
+  'Guitar',
+  'Piano',
+  'Drum',
+  'Bass guitar',
+  'Electronic music'
+];

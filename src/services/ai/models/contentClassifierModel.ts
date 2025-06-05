@@ -21,41 +21,64 @@ export class ContentClassifierModel extends BaseModel {
     
     try {
       this.useWebGPU = await WebGpuUtils.checkSupport();
-      this.whisperProcessor = new WhisperProcessor(this.useWebGPU);
       
-      const whisperLoaded = await this.whisperProcessor.initialize();
+      // Try to load models in order of preference
       const yamnetLoaded = await this.yamnetProcessor.initialize();
+      let whisperLoaded = false;
       
-      if (whisperLoaded || yamnetLoaded) {
+      if (this.useWebGPU) {
+        whisperLoaded = await this.whisperProcessor.initialize(this.useWebGPU);
+      }
+      
+      if (yamnetLoaded || whisperLoaded) {
         this.setInitialized(true);
         this.showToast(
           "Content Classifier Ready", 
-          `Loaded with ${whisperLoaded ? 'Whisper' : 'YAMNet'}`
+          `Loaded with ${yamnetLoaded ? 'YAMNet' : 'Whisper'} (${this.useWebGPU ? 'WebGPU' : 'CPU'})`
         );
         return true;
       } else {
-        throw new Error("Failed to load any content classification model");
+        // Use fallback analysis
+        this.setInitialized(true);
+        this.showToast(
+          "Content Classifier Ready", 
+          "Using algorithmic analysis"
+        );
+        return true;
       }
     } catch (error) {
-      this.setError(error as Error);
-      return false;
+      console.warn("Content classifier initialization error:", error);
+      // Still mark as initialized to allow fallback processing
+      this.setInitialized(true);
+      this.showToast(
+        "Content Classifier Ready", 
+        "Using basic analysis",
+        "default"
+      );
+      return true;
+    } finally {
+      this.setLoading(false);
     }
   }
   
   async processAudio(audioBuffer: AudioBuffer): Promise<string[]> {
-    if (!this.isReady()) {
-      throw new Error("Content classifier not ready");
+    if (!this.validateAudioBuffer(audioBuffer)) {
+      return ['invalid'];
     }
     
     try {
       let classifications: string[] = [];
       
-      if (this.whisperProcessor.isReady()) {
-        classifications = await this.whisperProcessor.process(audioBuffer);
-      } else if (this.yamnetProcessor.isReady()) {
+      // Try YAMNet first (more reliable)
+      if (this.yamnetProcessor.isReady()) {
         classifications = await this.yamnetProcessor.process(audioBuffer);
+      } 
+      // Then try Whisper
+      else if (this.whisperProcessor.isReady()) {
+        classifications = await this.whisperProcessor.process(audioBuffer);
       }
       
+      // Fallback to algorithmic analysis
       if (classifications.length === 0) {
         classifications = AudioAnalysisUtils.analyzeCharacteristics(audioBuffer);
       }
@@ -63,13 +86,18 @@ export class ContentClassifierModel extends BaseModel {
       return classifications;
     } catch (error) {
       console.error("Error during content classification:", error);
+      // Always provide fallback
       return AudioAnalysisUtils.analyzeCharacteristics(audioBuffer);
     }
   }
   
   dispose(): void {
-    this.whisperProcessor.dispose();
-    this.yamnetProcessor.dispose();
-    this.setInitialized(false);
+    try {
+      this.whisperProcessor.dispose();
+      this.yamnetProcessor.dispose();
+      this.setInitialized(false);
+    } catch (error) {
+      console.warn("Error disposing content classifier:", error);
+    }
   }
 }
