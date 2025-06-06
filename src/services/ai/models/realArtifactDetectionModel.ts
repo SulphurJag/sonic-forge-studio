@@ -1,4 +1,3 @@
-
 import { BaseModel } from './baseModel';
 import { HF_MODELS, TFJS_MODELS, MODEL_CONFIGS } from './modelTypes';
 import { AudioResamplingUtils } from './utils/audioResamplingUtils';
@@ -431,7 +430,7 @@ export class RealArtifactDetectionModel extends BaseModel {
       }
       
       if (options.fixCrackles) {
-        this.fixCrackles(outputData, audioBuffer.sampleRate);
+        this.fixCrackles(outputData);
       }
       
       if (options.fixDistortion) {
@@ -484,7 +483,7 @@ export class RealArtifactDetectionModel extends BaseModel {
     }
   }
   
-  private fixCrackles(audioData: Float32Array, sampleRate: number): void {
+  private fixCrackles(audioData: Float32Array): void {
     // Apply adaptive median filter for crackle removal
     const windowSize = Math.floor(sampleRate * 0.0005); // 0.5ms window
     
