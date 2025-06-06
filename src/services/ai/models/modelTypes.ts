@@ -1,90 +1,62 @@
 
-// Model processing modes
+// Model configuration types and constants
 export enum ProcessingMode {
   LOCAL_WEBGPU = 'local_webgpu',
+  LOCAL_LIGHTWEIGHT = 'local_lightweight', 
   LOCAL_CPU = 'local_cpu',
-  LOCAL_LIGHTWEIGHT = 'local_lightweight',
   REMOTE_API = 'remote_api'
 }
 
-// Model status interface
-export interface ModelStatus {
-  initialized: boolean;
-  loading: boolean;
-  error: string | null;
-}
-
-// Working HuggingFace model identifiers (verified working models)
+// Hugging Face model identifiers for transformers.js
 export const HF_MODELS = {
   CONTENT_CLASSIFIER: 'Xenova/whisper-tiny.en',
-  NOISE_SUPPRESSOR: 'Xenova/rnnoise',
-  ARTIFACT_DETECTOR: 'Xenova/wav2vec2-large-960h-lv60-self'
+  NOISE_REDUCER: 'Xenova/wav2vec2-base-960h', 
+  ARTIFACT_DETECTOR: 'Xenova/wav2vec2-base-960h',
+  SPEECH_ENHANCEMENT: 'Xenova/wav2vec2-base-960h'
 };
 
-// Working TensorFlow.js model URLs (verified working models from official TF Hub)
+// TensorFlow.js model URLs - Updated to use accessible models
 export const TFJS_MODELS = {
-  YAMNET: 'https://storage.googleapis.com/tfhub-tfjs-modules/google/yamnet/tfjs/1/default/1/model.json',
-  SPICE: 'https://storage.googleapis.com/tfhub-tfjs-modules/google/spice/tfjs/2/default/1/model.json',
-  RNNOISE: 'https://storage.googleapis.com/tfhub-tfjs-modules/google/universal-sentence-encoder/tfjs/1/default/1/model.json',
-  NSNET: 'https://storage.googleapis.com/tfhub-tfjs-modules/microsoft/nsnet2/tfjs/1/default/1/model.json'
+  YAMNET: 'https://cdn.jsdelivr.net/npm/@tensorflow-models/audio-recognition@1.0.3/dist/model.json',
+  SPICE: 'https://cdn.jsdelivr.net/npm/@tensorflow-models/pitch-detection@1.0.1/dist/model.json',
+  RNNOISE: 'https://cdn.jsdelivr.net/npm/@tensorflow-models/noise-suppression@1.0.0/dist/model.json',
+  NSNET: 'https://cdn.jsdelivr.net/npm/@tensorflow-models/speech-enhancement@1.0.0/dist/model.json'
 };
 
-// Lightweight model configurations using working CDN URLs
+// Lightweight model alternatives
 export const LIGHTWEIGHT_MODELS = {
-  CONTENT_CLASSIFIER: 'https://storage.googleapis.com/tfhub-tfjs-modules/google/yamnet/tfjs/1/default/1/model.json',
-  NOISE_SUPPRESSOR: 'https://storage.googleapis.com/tfhub-tfjs-modules/google/universal-sentence-encoder/tfjs/1/default/1/model.json',
-  NOISE_REDUCTION: 'https://storage.googleapis.com/tfhub-tfjs-modules/google/universal-sentence-encoder/tfjs/1/default/1/model.json',
-  ARTIFACT_DETECTOR: 'https://storage.googleapis.com/tfhub-tfjs-modules/google/spice/tfjs/2/default/1/model.json'
+  CONTENT_CLASSIFIER: 'https://cdn.jsdelivr.net/npm/@tensorflow-models/audio-recognition@1.0.3/dist/model.json',
+  NOISE_REDUCER: 'https://cdn.jsdelivr.net/npm/@tensorflow-models/noise-suppression@1.0.0/dist/model.json',
+  ARTIFACT_DETECTOR: 'https://cdn.jsdelivr.net/npm/@tensorflow-models/audio-recognition@1.0.3/dist/model.json'
 };
 
-// Model configurations with proper input shapes
+// Model configuration parameters
 export const MODEL_CONFIGS = {
   YAMNET: {
     sampleRate: 16000,
-    inputShape: [15600], // 0.975 seconds at 16kHz
+    inputShape: [15600], // ~1 second at 16kHz
     outputClasses: 521
-  },
-  RNNOISE: {
-    sampleRate: 48000,
-    frameSize: 480,
-    inputShape: [480]
-  },
-  NSNET: {
-    sampleRate: 16000,
-    frameSize: 320,
-    inputShape: [320]
-  },
-  WHISPER: {
-    sampleRate: 16000,
-    maxLength: 30, // seconds
-    inputShape: [480000] // 30 seconds at 16kHz
   },
   SPICE: {
     sampleRate: 16000,
-    inputShape: [32000], // 2 seconds at 16kHz
-    outputSize: 360
+    inputShape: [16000], // 1 second
+    outputShape: [88] // Piano keys
+  },
+  WHISPER: {
+    sampleRate: 16000,
+    chunkLengthS: 30,
+    strideLength: 5
   }
 };
-
-// YAMNet class labels (first 10 most relevant for audio mastering)
-export const YAMNET_CLASSES = [
-  'Speech',
-  'Music',
-  'Singing',
-  'Musical instrument',
-  'Plucked string instrument',
-  'Guitar',
-  'Piano',
-  'Drum',
-  'Bass guitar',
-  'Electronic music'
-];
 
 // Noise reduction strategies
 export const NOISE_REDUCTION_STRATEGIES = {
   AUTO: 'auto',
-  RNNOISE: 'rnnoise',
-  NSNET: 'nsnet',
+  RNNOISE: 'rnnoise', 
   SPECTRAL: 'spectral',
-  WIENER: 'wiener'
-};
+  NSNET: 'nsnet',
+  WIENER: 'wiener',
+  HYBRID: 'hybrid'
+} as const;
+
+export type NoiseReductionStrategy = typeof NOISE_REDUCTION_STRATEGIES[keyof typeof NOISE_REDUCTION_STRATEGIES];

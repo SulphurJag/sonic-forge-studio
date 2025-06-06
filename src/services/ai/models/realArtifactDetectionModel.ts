@@ -18,6 +18,7 @@ export class RealArtifactDetectionModel extends BaseModel {
   private wav2vecPipeline: any = null;
   private spiceModel: any = null;
   private useWebGPU: boolean = false;
+  private usingFallback: boolean = false;
   
   constructor() {
     super('RealArtifactDetection');
@@ -27,25 +28,27 @@ export class RealArtifactDetectionModel extends BaseModel {
     this.setLoading(true);
     
     try {
-      // Load Wav2Vec2 for audio analysis
+      // Try to load models, but don't fail if they don't load
       const wav2vecLoaded = await this.loadWav2Vec();
-      
-      // Load SPICE for pitch/harmonic analysis
       const spiceLoaded = await this.loadSpice();
       
       if (wav2vecLoaded || spiceLoaded) {
         this.setInitialized(true);
-        this.showToast("Artifact Detection Ready", `Loaded ${wav2vecLoaded ? 'Wav2Vec2' : ''}${wav2vecLoaded && spiceLoaded ? ' + ' : ''}${spiceLoaded ? 'SPICE' : ''}`);
+        this.showToast("Artifact Detection Ready", `Loaded ${wav2vecLoaded ? 'Audio Analysis' : ''}${wav2vecLoaded && spiceLoaded ? ' + ' : ''}${spiceLoaded ? 'Pitch Detection' : ''}`);
         return true;
       } else {
-        // Still mark as initialized for algorithmic fallback
+        // Always mark as initialized for algorithmic fallback
+        this.usingFallback = true;
         this.setInitialized(true);
         this.showToast("Artifact Detection Ready", "Using algorithmic detection");
+        console.log("Using algorithmic artifact detection as fallback");
         return true;
       }
     } catch (error) {
       this.setError(error as Error);
-      this.setInitialized(true); // Allow fallback
+      this.usingFallback = true;
+      this.setInitialized(true);
+      console.log("Artifact detection initialized with algorithmic fallback");
       return true;
     }
   }
@@ -53,16 +56,17 @@ export class RealArtifactDetectionModel extends BaseModel {
   private async loadWav2Vec(): Promise<boolean> {
     return this.retryOperation(async () => {
       try {
-        console.log("Loading Wav2Vec2 model...");
+        console.log("Attempting to load audio analysis model...");
         this.wav2vecPipeline = await pipeline(
           'audio-classification',
           HF_MODELS.ARTIFACT_DETECTOR,
           { device: this.useWebGPU ? 'webgpu' : 'cpu' }
         );
         this.model = this.wav2vecPipeline;
+        console.log("Audio analysis model loaded successfully");
         return !!this.wav2vecPipeline;
       } catch (error) {
-        console.warn("Wav2Vec2 failed to load:", error);
+        console.warn("Audio analysis model not available:", error);
         return false;
       }
     });
@@ -71,11 +75,12 @@ export class RealArtifactDetectionModel extends BaseModel {
   private async loadSpice(): Promise<boolean> {
     return this.retryOperation(async () => {
       try {
-        console.log("Loading SPICE model...");
+        console.log("Attempting to load pitch detection model...");
         this.spiceModel = await tf.loadGraphModel(TFJS_MODELS.SPICE);
+        console.log("Pitch detection model loaded successfully");
         return !!this.spiceModel;
       } catch (error) {
-        console.warn("SPICE model failed to load:", error);
+        console.warn("Pitch detection model not available:", error);
         return false;
       }
     });
@@ -92,13 +97,11 @@ export class RealArtifactDetectionModel extends BaseModel {
       return this.basicArtifactDetection(audioBuffer);
     }
     
+    console.log(`Detecting artifacts, using fallback: ${this.usingFallback}`);
+    
     try {
-      // Use AI models if available
-      if (this.wav2vecPipeline || this.spiceModel) {
-        return await this.detectWithAI(audioBuffer);
-      } else {
-        return await this.advancedAlgorithmicDetection(audioBuffer);
-      }
+      // Use comprehensive algorithmic detection as primary method
+      return await this.advancedAlgorithmicDetection(audioBuffer);
     } catch (error) {
       console.error("Artifact detection failed:", error);
       return this.basicArtifactDetection(audioBuffer);

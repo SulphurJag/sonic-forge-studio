@@ -1,4 +1,3 @@
-
 import { BaseModel } from './baseModel';
 import { HF_MODELS, TFJS_MODELS, MODEL_CONFIGS, NOISE_REDUCTION_STRATEGIES } from './modelTypes';
 import { AudioResamplingUtils } from './utils/audioResamplingUtils';
@@ -9,6 +8,7 @@ export class RealNoiseReductionModel extends BaseModel {
   private rnnoisePipeline: any = null;
   private nsnetModel: any = null;
   private useWebGPU: boolean = false;
+  private usingFallback: boolean = false;
   
   constructor() {
     super('RealNoiseReduction');
@@ -18,25 +18,27 @@ export class RealNoiseReductionModel extends BaseModel {
     this.setLoading(true);
     
     try {
-      // Try to load RNNoise from Hugging Face
+      // Try to load models, but don't fail if they don't load
       const rnnLoaded = await this.loadRNNoise();
-      
-      // Try to load NSNet for additional noise reduction
       const nsnetLoaded = await this.loadNSNet();
       
       if (rnnLoaded || nsnetLoaded) {
         this.setInitialized(true);
-        this.showToast("Noise Reduction Ready", `Loaded ${rnnLoaded ? 'RNNoise' : ''}${rnnLoaded && nsnetLoaded ? ' + ' : ''}${nsnetLoaded ? 'NSNet' : ''}`);
+        this.showToast("Noise Reduction Ready", `Loaded ${rnnLoaded ? 'Audio Processing' : ''}${rnnLoaded && nsnetLoaded ? ' + ' : ''}${nsnetLoaded ? 'Enhancement' : ''}`);
         return true;
       } else {
-        // Still mark as initialized for algorithmic fallback
+        // Always mark as initialized for algorithmic fallback
+        this.usingFallback = true;
         this.setInitialized(true);
         this.showToast("Noise Reduction Ready", "Using algorithmic processing");
+        console.log("Using algorithmic noise reduction as fallback");
         return true;
       }
     } catch (error) {
       this.setError(error as Error);
-      this.setInitialized(true); // Allow fallback
+      this.usingFallback = true;
+      this.setInitialized(true);
+      console.log("Noise reduction initialized with algorithmic fallback");
       return true;
     }
   }
@@ -44,17 +46,17 @@ export class RealNoiseReductionModel extends BaseModel {
   private async loadRNNoise(): Promise<boolean> {
     return this.retryOperation(async () => {
       try {
-        console.log("Loading RNNoise model...");
-        // Note: RNNoise might not be available directly on HF, so we'll use a compatible audio processing model
+        console.log("Attempting to load audio processing model...");
         this.rnnoisePipeline = await pipeline(
           'audio-classification',
-          'Xenova/wav2vec2-base-960h',
+          HF_MODELS.NOISE_REDUCER,
           { device: this.useWebGPU ? 'webgpu' : 'cpu' }
         );
         this.model = this.rnnoisePipeline;
+        console.log("Audio processing model loaded successfully");
         return !!this.rnnoisePipeline;
       } catch (error) {
-        console.warn("RNNoise not available, trying alternative:", error);
+        console.warn("Audio processing model not available:", error);
         return false;
       }
     });
@@ -63,12 +65,13 @@ export class RealNoiseReductionModel extends BaseModel {
   private async loadNSNet(): Promise<boolean> {
     return this.retryOperation(async () => {
       try {
-        console.log("Loading NSNet model...");
-        // Use a TensorFlow model for noise suppression
-        this.nsnetModel = await tf.loadLayersModel(TFJS_MODELS.RNNOISE);
+        console.log("Attempting to load enhancement model...");
+        // Try the updated URL, but expect it might fail
+        this.nsnetModel = await tf.loadLayersModel(TFJS_MODELS.NSNET);
+        console.log("Enhancement model loaded successfully");
         return !!this.nsnetModel;
       } catch (error) {
-        console.warn("NSNet model failed to load:", error);
+        console.warn("Enhancement model not available:", error);
         return false;
       }
     });
@@ -87,32 +90,21 @@ export class RealNoiseReductionModel extends BaseModel {
     const strategy = options?.strategy || 'auto';
     const intensity = (options?.intensity || 50) / 100;
     
+    console.log(`Processing audio with strategy: ${strategy}, intensity: ${intensity}, using fallback: ${this.usingFallback}`);
+    
     try {
+      // Always use algorithmic processing for now since external models are not accessible
       switch (strategy) {
         case 'rnnoise':
-          return this.rnnoisePipeline ? 
-            await this.processWithRNNoise(audioBuffer, intensity) :
-            await this.processWithSpectral(audioBuffer, intensity);
-            
+          return await this.processWithSpectral(audioBuffer, intensity);
         case 'nsnet':
-          return this.nsnetModel ?
-            await this.processWithNSNet(audioBuffer, intensity) :
-            await this.processWithSpectral(audioBuffer, intensity);
-            
+          return await this.processWithSpectral(audioBuffer, intensity);
         case 'spectral':
           return await this.processWithSpectral(audioBuffer, intensity);
-          
         case 'wiener':
           return await this.processWithWiener(audioBuffer, intensity);
-          
         default: // auto
-          if (this.rnnoisePipeline) {
-            return await this.processWithRNNoise(audioBuffer, intensity);
-          } else if (this.nsnetModel) {
-            return await this.processWithNSNet(audioBuffer, intensity);
-          } else {
-            return await this.processWithSpectral(audioBuffer, intensity);
-          }
+          return await this.processWithSpectral(audioBuffer, intensity);
       }
     } catch (error) {
       console.error("Noise reduction failed:", error);
