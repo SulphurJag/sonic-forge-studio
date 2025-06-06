@@ -1,10 +1,16 @@
-
 // Model configuration types and constants
 export enum ProcessingMode {
   LOCAL_WEBGPU = 'local_webgpu',
   LOCAL_LIGHTWEIGHT = 'local_lightweight', 
   LOCAL_CPU = 'local_cpu',
   REMOTE_API = 'remote_api'
+}
+
+// Model status interface
+export interface ModelStatus {
+  initialized: boolean;
+  loading: boolean;
+  error: string | null;
 }
 
 // Hugging Face model identifiers for transformers.js

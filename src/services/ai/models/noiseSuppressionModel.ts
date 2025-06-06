@@ -40,7 +40,7 @@ export class NoiseSuppressionModel extends BaseModel {
   private async loadYAMNetModel(): Promise<boolean> {
     return this.retryOperation(async () => {
       console.log("Loading YAMNet model for noise analysis...");
-      this.yamnetModel = await tf.loadGraphModel(LIGHTWEIGHT_MODELS.NOISE_REDUCTION);
+      this.yamnetModel = await tf.loadGraphModel(LIGHTWEIGHT_MODELS.NOISE_REDUCER);
       this.model = this.yamnetModel;
       return !!this.model;
     });
