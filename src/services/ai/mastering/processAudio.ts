@@ -85,13 +85,14 @@ export async function processAudioWithAI(
         
         showArtifactDetectedNotification();
         
-        // Fix artifacts
-        const cleanedBuffer = await artifactEliminator.eliminateArtifacts(
+        // Fix artifacts using the correct method name
+        const cleanedBuffer = await artifactEliminator.processBuffer(
           currentBuffer,
           {
             fixClipping: artifactAnalysis.hasClipping,
             fixCrackles: artifactAnalysis.hasCrackles,
-            fixClicksAndPops: artifactAnalysis.hasClicksAndPops
+            fixClicksAndPops: artifactAnalysis.hasClicksAndPops,
+            fixDistortion: artifactAnalysis.hasDistortion
           }
         );
         

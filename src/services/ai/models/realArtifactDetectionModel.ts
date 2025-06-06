@@ -485,7 +485,7 @@ export class RealArtifactDetectionModel extends BaseModel {
   
   private fixCrackles(audioData: Float32Array): void {
     // Apply adaptive median filter for crackle removal
-    const windowSize = Math.floor(sampleRate * 0.0005); // 0.5ms window
+    const windowSize = 24; // Fixed window size instead of using undefined sampleRate
     
     for (let i = windowSize; i < audioData.length - windowSize; i++) {
       const window = audioData.slice(i - windowSize, i + windowSize + 1);
