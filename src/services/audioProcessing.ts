@@ -31,6 +31,7 @@ class AudioProcessor {
   private currentAudioBuffer: AudioBuffer | null = null;
   private aiEngine: AIAudioMasteringEngine;
   private isInitialized: boolean = false;
+  private initializationPromise: Promise<void> | null = null;
   
   constructor() {
     this.aiEngine = new AIAudioMasteringEngine();
@@ -39,12 +40,27 @@ class AudioProcessor {
   // Initialize the audio processor
   async initialize(): Promise<void> {
     if (this.isInitialized) return;
+    if (this.initializationPromise) return this.initializationPromise;
     
+    this.initializationPromise = this.doInitialize();
+    return this.initializationPromise;
+  }
+  
+  private async doInitialize(): Promise<void> {
     try {
-      this.audioContext = new AudioContext();
+      // Create audio context with proper handling
+      if (!this.audioContext) {
+        this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      }
+      
+      // Resume context if suspended
+      if (this.audioContext.state === 'suspended') {
+        await this.audioContext.resume();
+      }
+      
       console.log("Audio context initialized successfully");
       
-      // Initialize AI engine in background
+      // Initialize AI engine in background (don't wait for it)
       this.aiEngine.initialize().catch(error => {
         console.warn("AI engine initialization failed:", error);
       });
@@ -52,18 +68,28 @@ class AudioProcessor {
       this.isInitialized = true;
     } catch (error) {
       console.error("Failed to initialize audio processor:", error);
+      // Still mark as initialized to allow basic functionality
+      this.isInitialized = true;
       throw error;
     }
   }
   
   // Load audio file
   async loadAudio(file: File): Promise<void> {
+    // Ensure initialization
+    await this.initialize();
+    
     if (!this.audioContext) {
-      throw new Error("Audio processor not initialized");
+      throw new Error("Audio context not available");
     }
     
-    const arrayBuffer = await file.arrayBuffer();
-    this.currentAudioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      this.currentAudioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
+    } catch (error) {
+      console.error("Error decoding audio data:", error);
+      throw new Error("Failed to decode audio file. Please ensure it's a valid audio format.");
+    }
   }
   
   // Check if audio is loaded
@@ -110,6 +136,9 @@ class AudioProcessor {
       console.warn("AI processing failed, falling back to basic processing:", error);
       processedBuffer = await this.basicProcessing(this.currentAudioBuffer, settings);
     }
+    
+    // Store the processed buffer for download
+    this.currentAudioBuffer = processedBuffer;
     
     // Analyze the results
     const inputLufs = this.calculateLUFS(this.currentAudioBuffer);
@@ -261,6 +290,7 @@ class AudioProcessor {
     this.currentAudioBuffer = null;
     this.aiEngine.dispose();
     this.isInitialized = false;
+    this.initializationPromise = null;
   }
 }
 

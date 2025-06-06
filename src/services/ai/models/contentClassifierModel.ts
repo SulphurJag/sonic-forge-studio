@@ -61,6 +61,7 @@ export class ContentClassifierModel extends BaseModel {
     }
   }
   
+  // Implement the required processAudio method from BaseModel
   async processAudio(audioBuffer: AudioBuffer): Promise<string[]> {
     if (!this.validateAudioBuffer(audioBuffer)) {
       return ['invalid'];

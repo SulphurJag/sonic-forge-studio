@@ -1,4 +1,3 @@
-
 import { BaseModel } from './baseModel';
 import { TFJS_MODELS, MODEL_CONFIGS, LIGHTWEIGHT_MODELS } from './modelTypes';
 import { AudioResamplingUtils } from './utils/audioResamplingUtils';
@@ -34,6 +33,8 @@ export class NoiseSuppressionModel extends BaseModel {
       // Still mark as initialized to allow fallback processing
       this.setInitialized(true);
       return true;
+    } finally {
+      this.setLoading(false);
     }
   }
   

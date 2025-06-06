@@ -39,6 +39,8 @@ export class ArtifactDetectionModel extends BaseModel {
       // Still mark as initialized to allow fallback processing
       this.setInitialized(true);
       return true;
+    } finally {
+      this.setLoading(false);
     }
   }
   
@@ -115,7 +117,7 @@ export class ArtifactDetectionModel extends BaseModel {
         const analysis = await prediction.data();
         
         // Interpret SPICE output for artifact detection
-        const artifacts = this.interpretSpiceOutput(analysis, start / audioBuffer.sampleRate, end / audioBuffer.sampleRate);
+        const artifacts = this.interpretSpiceOutput(analysis, start / MODEL_CONFIGS.SPICE.sampleRate, end / MODEL_CONFIGS.SPICE.sampleRate);
         
         if (artifacts.hasClipping) result.hasClipping = true;
         if (artifacts.hasCrackles) result.hasCrackles = true;
@@ -128,7 +130,7 @@ export class ArtifactDetectionModel extends BaseModel {
       } catch (error) {
         console.warn("SPICE analysis failed for chunk, using fallback:", error);
         // Fallback to basic detection for this chunk
-        const basicResult = this.analyzeChunkBasic(chunk, start / audioBuffer.sampleRate);
+        const basicResult = this.analyzeChunkBasic(chunk, start / MODEL_CONFIGS.SPICE.sampleRate);
         if (basicResult.hasArtifacts) {
           result.problematicSegments.push(...basicResult.segments);
         }
